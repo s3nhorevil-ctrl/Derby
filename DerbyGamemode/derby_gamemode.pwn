@@ -8,9 +8,6 @@
     Includes necessarios:
         - a_samp.inc
         - sscanf2.inc
-        - Pawn.CMD (ou zcmd)
-        - foreach.inc / YSI y_iterate
-        - OnPlayerPause (include para detectar ESC)
     
     Funcionamento:
         - Jogadores entram no Derby automaticamente ao conectar
@@ -22,14 +19,27 @@
 
 #include <a_samp>
 #include <sscanf2>
-#include <Pawn.CMD>
-#include <foreach>
-#include <OnPlayerPause>
 
 #pragma tabsize 0
 #pragma dynamic 65536
 
 native IsValidVehicle(vehicleid);
+
+// =============================================================================
+// SISTEMA DE DETECCAO DE PAUSE (substitui OnPlayerPause)
+// =============================================================================
+new PlayerLastUpdate[MAX_PLAYERS];
+
+stock IsPlayerPaused(playerid)
+{
+    if(GetTickCount() - PlayerLastUpdate[playerid] > 2000) return 1;
+    return 0;
+}
+
+// =============================================================================
+// MACRO FOREACH (substitui include foreach)
+// =============================================================================
+#define foreach(%0) for(new %0 = 0, __j = GetPlayerPoolSize(); %0 <= __j; %0++) if(IsPlayerConnected(%0))
 
 
 // =============================================================================
@@ -204,7 +214,7 @@ stock StripNewLine(string[])
 
 stock SendMessageToAllDerby(color, const message[])
 {
-    foreach(new i : Player)
+    foreach(i)
     {
         if(PI[i][P_IN_DERBY])
         {
@@ -420,7 +430,7 @@ PlayerDerbyDead(playerid)
     // Verificar se sobrou apenas 1 jogador (VENCEDOR)
     if(DI[D_RUNNINGPLAYERS] == 1)
     {
-        foreach(new i : Player)
+        foreach(i)
         {
             if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL)
             {
@@ -466,7 +476,7 @@ PlayerDerbyDead(playerid)
     {
         // Jogador morreu mas ainda tem mais de 1 ativo - modo spectate
         PI[playerid][P_DERBY_STATUS] = PD_SPECTATE;
-        foreach(new i : Player)
+        foreach(i)
         {
             if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL)
             {
@@ -496,7 +506,7 @@ CheckDerby()
         {
             if(DI[D_RUNNINGPLAYERS] == 1)
             {
-                foreach(new i : Player)
+                foreach(i)
                 {
                     if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL)
                     {
@@ -545,7 +555,7 @@ UpdatePlayersDerbyStatus()
     {
         case DERBY_WAIT:
         {
-            foreach(new players : Player)
+            foreach(players)
             {
                 if(PI[players][P_IN_DERBY])
                 {
@@ -585,7 +595,7 @@ UpdatePlayersDerbyStatus()
         }
         case DERBY_RUNNING:
         {
-            foreach(new players : Player)
+            foreach(players)
             {
                 if(PI[players][P_IN_DERBY])
                 {
@@ -673,7 +683,7 @@ UpdatePlayerDerbyStatus(playerid)
             // Entrou durante partida - modo spectate
             SetPlayerVirtualWorld(playerid, DI[D_ID] + DERBY_VW);
             PI[playerid][P_DERBY_STATUS] = PD_SPECTATE;
-            foreach(new i : Player)
+            foreach(i)
             {
                 if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL)
                 {
@@ -723,7 +733,7 @@ public NextDerbyStatus()
 
             TextDrawSetString(TD_DERBY_GodCar[3], "SIM_GOD_CAR:_0~n~NAO_GOD_CAR:_0~n~_");
 
-            foreach(new players : Player)
+            foreach(players)
             {
                 if(PI[players][P_IN_DERBY])
                 {
@@ -756,7 +766,7 @@ public NextDerbyStatus()
 
             TextDrawSetString(TD_DERBY_GodCar[3], "SIM_GOD_CAR:_0~n~NAO_GOD_CAR:_0~n~_");
 
-            foreach(new players : Player)
+            foreach(players)
             {
                 if(PI[players][P_IN_DERBY])
                 {
@@ -774,7 +784,7 @@ public NextDerbyStatus()
             TextDrawSetString(TD_DerbyMessage, "~g~go! ~r~go! ~w~go!");
             SetTimer("HideDerbyMessage", 2000, false);
 
-            foreach(new i : Player)
+            foreach(i)
             {
                 PI[i][P_DERBY_VOTED] = false;
             }
@@ -818,7 +828,7 @@ public DerbyTimeOutCountdown()
     DI[D_TIMEOUT_COUNTER]--;
 
     // Detector de ESC/Pause
-    foreach(new p : Player)
+    foreach(p)
     {
         if(PI[p][P_IN_DERBY] && DI[D_PLAYERS] > 1 && PI[p][P_DERBY_STATUS] == PD_NORMAL)
         {
@@ -841,7 +851,7 @@ public DerbyTimeOutCountdown()
 
         if(DI[D_WINNER] == NO_WINNER)
         {
-            foreach(new playerid : Player)
+            foreach(playerid)
             {
                 if(PI[playerid][P_IN_DERBY] && PI[playerid][P_DERBY_STATUS] == PD_NORMAL)
                 {
@@ -944,7 +954,7 @@ public GodDerbyTimer()
 {
     if(DerbyAtivarGod == true && DI[D_STATUS] == DERBY_RUNNING)
     {
-        foreach(new i : Player)
+        foreach(i)
         {
             if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL)
             {
@@ -966,7 +976,7 @@ public AntiAFKTimer()
 {
     if(DI[D_STATUS] != DERBY_RUNNING || DI[D_PLAYERS] <= 1) return 1;
 
-    foreach(new i : Player)
+    foreach(i)
     {
         if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL)
         {
@@ -1428,6 +1438,9 @@ public OnVehicleDamageStatusUpdate(vehicleid, playerid)
 
 public OnPlayerUpdate(playerid)
 {
+    // Atualizar timestamp para deteccao de pause
+    PlayerLastUpdate[playerid] = GetTickCount();
+
     // Verificacao continua de queda durante o derby
     if(PI[playerid][P_IN_DERBY] && PI[playerid][P_DERBY_STATUS] == PD_NORMAL)
     {
@@ -1494,7 +1507,7 @@ public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
             new found = -1;
             new current = PI[playerid][P_DERBY_SPECTATEPLAYER];
 
-            foreach(new i : Player)
+            foreach(i)
             {
                 if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL && i != current)
                 {
@@ -1563,10 +1576,60 @@ public OnPlayerClickTextDraw(playerid, Text:clickedid)
 
 
 // =============================================================================
+// SISTEMA DE COMANDOS (sem include externo)
+// =============================================================================
+
+public OnPlayerCommandText(playerid, cmdtext[])
+{
+    new cmd[32], params[128], idx;
+    cmd = strtok(cmdtext, idx);
+    format(params, sizeof(params), "%s", cmdtext[idx]);
+
+    // Remover espaco inicial dos params
+    if(strlen(params) > 0 && params[0] == ' ')
+    {
+        strdel(params, 0, 1);
+    }
+
+    if(!strcmp(cmd, "/derby", true)) return dcmd_derby(playerid, params);
+    if(!strcmp(cmd, "/sair", true)) return dcmd_sair(playerid, params);
+    if(!strcmp(cmd, "/stats", true)) return dcmd_stats(playerid, params);
+    if(!strcmp(cmd, "/top", true)) return dcmd_top(playerid, params);
+    if(!strcmp(cmd, "/ajuda", true)) return dcmd_ajuda(playerid, params);
+    if(!strcmp(cmd, "/help", true)) return dcmd_help(playerid, params);
+    if(!strcmp(cmd, "/reloadmaps", true)) return dcmd_reloadmaps(playerid, params);
+    if(!strcmp(cmd, "/skimap", true)) return dcmd_skimap(playerid, params);
+    if(!strcmp(cmd, "/setmap", true)) return dcmd_setmap(playerid, params);
+
+    SCM(playerid, COLOR_RED, "[ERRO]: Comando desconhecido. Use /ajuda.");
+    return 1;
+}
+
+stock strtok(const string[], &index)
+{
+    new length = strlen(string);
+    new result[32];
+    new pos = 0;
+
+    // Pular espacos iniciais
+    while(index < length && string[index] == ' ') index++;
+
+    // Extrair token
+    while(index < length && string[index] != ' ' && pos < 31)
+    {
+        result[pos] = string[index];
+        pos++;
+        index++;
+    }
+    result[pos] = '\0';
+    return result;
+}
+
+// =============================================================================
 // COMANDOS
 // =============================================================================
 
-CMD:derby(playerid, params[])
+dcmd_derby(playerid, params[])
 {
     if(PI[playerid][P_IN_DERBY])
         return SCM(playerid, COLOR_ORANGE, "| DERBY | Voce ja esta no Derby!");
@@ -1578,7 +1641,7 @@ CMD:derby(playerid, params[])
     return 1;
 }
 
-CMD:sair(playerid, params[])
+dcmd_sair(playerid, params[])
 {
     if(!PI[playerid][P_IN_DERBY])
         return SCM(playerid, COLOR_ORANGE, "| DERBY | Voce nao esta no Derby!");
@@ -1591,7 +1654,7 @@ CMD:sair(playerid, params[])
     return 1;
 }
 
-CMD:stats(playerid, params[])
+dcmd_stats(playerid, params[])
 {
     if(!db_is_valid_handle(Database))
         return SCM(playerid, COLOR_RED, "[ERRO]: Banco de dados indisponivel.");
@@ -1625,7 +1688,7 @@ CMD:stats(playerid, params[])
 }
 
 
-CMD:top(playerid, params[])
+dcmd_top(playerid, params[])
 {
     if(!db_is_valid_handle(Database))
         return SCM(playerid, COLOR_RED, "[ERRO]: Banco de dados indisponivel.");
@@ -1661,7 +1724,7 @@ CMD:top(playerid, params[])
     return 1;
 }
 
-CMD:ajuda(playerid, params[])
+dcmd_ajuda(playerid, params[])
 {
     SCM(playerid, COLOR_GREEN, "============ COMANDOS DO DERBY ============");
     SCM(playerid, COLOR_WHITE, "  /derby   - Entrar no Derby");
@@ -1675,9 +1738,9 @@ CMD:ajuda(playerid, params[])
     return 1;
 }
 
-CMD:help(playerid, params[])
+dcmd_help(playerid, params[])
 {
-    return cmd_ajuda(playerid, params);
+    return dcmd_ajuda(playerid, "");
 }
 
 
@@ -1685,7 +1748,7 @@ CMD:help(playerid, params[])
 // ADMIN COMMANDS (Opcional)
 // =============================================================================
 
-CMD:reloadmaps(playerid, params[])
+dcmd_reloadmaps(playerid, params[])
 {
     if(!IsPlayerAdmin(playerid))
         return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON admins podem usar este comando.");
@@ -1697,7 +1760,7 @@ CMD:reloadmaps(playerid, params[])
     return 1;
 }
 
-CMD:skimap(playerid, params[])
+dcmd_skimap(playerid, params[])
 {
     if(!IsPlayerAdmin(playerid))
         return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON admins podem usar este comando.");
@@ -1716,7 +1779,7 @@ CMD:skimap(playerid, params[])
     return 1;
 }
 
-CMD:setmap(playerid, params[])
+dcmd_setmap(playerid, params[])
 {
     if(!IsPlayerAdmin(playerid))
         return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON admins podem usar este comando.");
