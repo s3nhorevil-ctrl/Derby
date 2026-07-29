@@ -53,14 +53,18 @@ servidor/
 │   └── derby_gamemode.pwn      <- Gamemode principal
 ├── scriptfiles/
 │   └── DERBY/
-│       ├── derbys.sfr          <- Lista de mapas (um por linha)
-│       ├── mapa_plataforma_alta.sfr
-│       ├── mapa_arena_circular.sfr
-│       ├── mapa_ponte_destruida.sfr
-│       ├── mapa_torre_queda.sfr
-│       └── mapa_rampa_caos.sfr
+│       ├── derbys.sfr          <- Lista de mapas ativos (um por linha)
+│       ├── atlantis.sfr        <- 85+ mapas reais incluidos!
+│       ├── pirate.sfr
+│       ├── demolition.sfr
+│       ├── tokyo.sfr
+│       ├── cross.sfr
+│       ├── ... (130 mapas no total)
+│       └── volcanic.sfr
 └── server.cfg
 ```
+
+**Nota:** Este gamemode ja vem com **130 mapas reais** prontos para uso! A lista `derbys.sfr` contém 85 mapas principais (sem variantes duplicadas). Edite o `derbys.sfr` para ativar/desativar mapas.
 
 ## Formato dos Mapas (.sfr)
 
