@@ -19,6 +19,7 @@
 
 #include <a_samp>
 #include <sscanf2>
+#include <streamer>
 
 #pragma tabsize 0
 #pragma dynamic 65536
@@ -1639,6 +1640,8 @@ RegisterPlayerStats(playerid)
 // CALLBACKS DO SA-MP
 // =============================================================================
 
+#include "derby_objects.inc"
+
 main()
 {
     print("\n========================================");
@@ -1671,6 +1674,7 @@ public OnGameModeInit()
     CreateDerbyTextDraws();
 
     // Carregar mapas
+    LoadAllDerbyObjects();
     LoadVirtualWorlds();
     LoadDerbyMapList();
     CacheMapNames();
