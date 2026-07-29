@@ -295,7 +295,11 @@ LoadDerbyNames(const mapname[])
 LoadDerby(derbyid)
 {
     new File:Handler = fopen(DERBY_FILENAMES[derbyid], io_read);
-    if(!Handler) return 0;
+    if(!Handler)
+    {
+        printf("[DERBY] ERRO: Nao foi possivel abrir o mapa: %s", DERBY_FILENAMES[derbyid]);
+        return 0;
+    }
     new Count;
     while(fread(Handler, File_String))
     {
@@ -907,7 +911,7 @@ public DerbyCountdown()
         return 1;
     }
 
-    if(DI[D_PLAYERS] <= 1)
+    if(DI[D_PLAYERS] <= 0)
     {
         DI[D_COUNTDOWN_COUNTER] = DERBY_COUNTDOWN_SECONDS + 1;
         new str[64];
@@ -1293,6 +1297,14 @@ public OnGameModeInit()
     SetGameModeText(GAMEMODETEXT);
     SendRconCommand("hostname "HOSTNAME);
 
+    // Classes de jogador (skins)
+    AddPlayerClass(0, 1958.3783, 1343.1572, 15.3746, 270.0, 0, 0, 0, 0, 0, 0);
+    AddPlayerClass(1, 1958.3783, 1343.1572, 15.3746, 270.0, 0, 0, 0, 0, 0, 0);
+    AddPlayerClass(2, 1958.3783, 1343.1572, 15.3746, 270.0, 0, 0, 0, 0, 0, 0);
+    AddPlayerClass(29, 1958.3783, 1343.1572, 15.3746, 270.0, 0, 0, 0, 0, 0, 0);
+    AddPlayerClass(47, 1958.3783, 1343.1572, 15.3746, 270.0, 0, 0, 0, 0, 0, 0);
+    AddPlayerClass(60, 1958.3783, 1343.1572, 15.3746, 270.0, 0, 0, 0, 0, 0, 0);
+
     // Desabilitar interior entrances e stunt bonuses
     DisableInteriorEnterExits();
     EnableStuntBonusForAll(0);
@@ -1370,20 +1382,25 @@ public OnPlayerDisconnect(playerid, reason)
 
 public OnPlayerSpawn(playerid)
 {
-    // Se nao esta no derby, entrar automaticamente
+    // Spawna no mundo - jogador deve usar /derby para entrar
     if(!PI[playerid][P_IN_DERBY])
     {
-        JoinPlayerDerby(playerid);
+        SetPlayerPos(playerid, 1958.3783, 1343.1572, 15.3746); // Las Venturas
+        SetPlayerFacingAngle(playerid, 270.0);
+        SetPlayerInterior(playerid, 0);
+        SetPlayerVirtualWorld(playerid, 0);
+        SetCameraBehindPlayer(playerid);
+        SCM(playerid, COLOR_YELLOW, "| INFO | Digite /derby para entrar no modo Derby!");
     }
     return 1;
 }
 
 public OnPlayerRequestClass(playerid, classid)
 {
-    // Spawn direto sem selecao de skin
-    SetPlayerPos(playerid, 0.0, 0.0, 5.0);
-    SetPlayerCameraPos(playerid, 0.0, 0.0, 50.0);
-    SetPlayerCameraLookAt(playerid, 0.0, 0.0, 5.0);
+    SetPlayerPos(playerid, 1958.3783, 1343.1572, 15.3746);
+    SetPlayerCameraPos(playerid, 1958.3783, 1338.1572, 17.0);
+    SetPlayerCameraLookAt(playerid, 1958.3783, 1343.1572, 15.3746);
+    SetPlayerFacingAngle(playerid, 180.0);
     return 1;
 }
 
