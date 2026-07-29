@@ -2767,6 +2767,7 @@ public OnPlayerCommandText(playerid, cmdtext[])
     if(!strcmp(cmd, "/top", true)) return dcmd_top(playerid, params);
     if(!strcmp(cmd, "/ajuda", true)) return dcmd_ajuda(playerid, params);
     if(!strcmp(cmd, "/help", true)) return dcmd_help(playerid, params);
+    if(!strcmp(cmd, "/diag", true)) return dcmd_diag(playerid, params);
     if(!strcmp(cmd, "/reloadmaps", true)) return dcmd_reloadmaps(playerid, params);
     if(!strcmp(cmd, "/skimap", true)) return dcmd_skimap(playerid, params);
     if(!strcmp(cmd, "/setmap", true)) return dcmd_setmap(playerid, params);
@@ -2937,6 +2938,62 @@ dcmd_help(playerid, const params[])
 // =============================================================================
 // ADMIN COMMANDS (Opcional)
 // =============================================================================
+
+// Diagnostico: mostra tudo que importa para descobrir por que o mapa nao aparece
+dcmd_diag(playerid, const params[])
+{
+    #pragma unused params
+    new str[160];
+    new pvw = GetPlayerVirtualWorld(playerid);
+
+    SCM(playerid, COLOR_GREEN, "========== DIAGNOSTICO DERBY ==========");
+
+    format(str, sizeof(str), "Mapas na lista: {FFFF00}%d{FFFFFF}   Tabela vworlds: {FFFF00}%d", TOTAL_DERBYS, VW_TOTAL);
+    SCM(playerid, COLOR_WHITE, str);
+
+    if(TOTAL_DERBYS <= 0)
+    {
+        SCM(playerid, COLOR_RED, ">> scriptfiles/DERBY/ NAO foi encontrado. Nada mais vai funcionar.");
+        return 1;
+    }
+
+    format(str, sizeof(str), "Mapa atual: id {FFFF00}%d{FFFFFF}  nome {FFFF00}%s", DI[D_ID], DI[D_NAME]);
+    SCM(playerid, COLOR_WHITE, str);
+
+    format(str, sizeof(str), "Arquivo: {FFFF00}%s", DERBY_FILENAMES[DI[D_ID]]);
+    SCM(playerid, COLOR_WHITE, str);
+
+    format(str, sizeof(str), "VW do mapa: {FFFF00}%d{FFFFFF}   Seu VW: {FFFF00}%d{FFFFFF}   %s",
+        DI[D_VW], pvw, (DI[D_VW] == pvw) ? ("{00FF00}(iguais - OK)") : ("{FF0000}(DIVERGENTE!)"));
+    SCM(playerid, COLOR_WHITE, str);
+
+    format(str, sizeof(str), "Veiculo do mapa: {FFFF00}%d{FFFFFF}   Z de eliminacao: {FFFF00}%.1f", DI[D_VEHICLE], DI[D_ZPOS]);
+    SCM(playerid, COLOR_WHITE, str);
+
+    format(str, sizeof(str), "Spawn 1 do mapa: {FFFF00}%.1f, %.1f, %.1f",
+        DERBY_SPAWN[0][0], DERBY_SPAWN[0][1], DERBY_SPAWN[0][2]);
+    SCM(playerid, COLOR_WHITE, str);
+
+    new Float:px, Float:py, Float:pz;
+    GetPlayerPos(playerid, px, py, pz);
+    format(str, sizeof(str), "Sua posicao agora: {FFFF00}%.1f, %.1f, %.1f", px, py, pz);
+    SCM(playerid, COLOR_WHITE, str);
+
+    SCM(playerid, COLOR_GREEN, "---------------- como ler ----------------");
+    if(DERBY_SPAWN[0][0] == 0.0 && DERBY_SPAWN[0][1] == 0.0)
+        SCM(playerid, COLOR_RED, ">> Spawn zerado: o arquivo .sfr nao foi lido.");
+    else
+        SCM(playerid, COLOR_GREY, ">> Spawn tem coordenadas: o .sfr foi lido corretamente.");
+
+    if(DI[D_VW] != pvw)
+        SCM(playerid, COLOR_RED, ">> Seu VW nao bate com o do mapa. Avise o desenvolvedor.");
+    else
+        SCM(playerid, COLOR_GREY, ">> VW correto. Se nao ha plataforma, o filterscript SFRDERBY nao esta ativo.");
+
+    SCM(playerid, COLOR_GREY, ">> No console deve aparecer: MAPAS DERBY CARGADOS || MAPAS: 52");
+    SCM(playerid, COLOR_GREY, ">> Se nao aparecer: falta 'plugins streamer' ou 'filterscripts SFRDERBY'.");
+    return 1;
+}
 
 dcmd_reloadmaps(playerid, const params[])
 {
