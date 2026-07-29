@@ -54,6 +54,7 @@ stock IsPlayerPaused(playerid)
 
 #define MAX_DERBY_PLAYERS       (20)
 #define MAX_DERBYS              (200)
+#define MAX_DERBY_OBJECTS       (500)
 #define NO_WINNER               (-1)
 
 #define DERBY_VW                (50)
@@ -146,6 +147,11 @@ new DERBY_SLOT_USED[MAX_DERBY_PLAYERS];
 new TOTAL_DERBYS;
 new File_String[512];
 new DERBY_FILENAMES[MAX_DERBYS][24];
+new DERBY_OBJFILES[MAX_DERBYS][24]; // arquivos de objetos (.txt)
+
+// Objetos do mapa atual
+new DERBY_OBJECTS[MAX_DERBY_OBJECTS];
+new DERBY_OBJECT_COUNT;
 
 // TextDraws
 new Text:TD_DERBY[9];
@@ -276,9 +282,17 @@ stock ResetAwayDerbyStatus(playerid)
 LoadDerbyNames(const mapname[])
 {
     new File:Handler = fopen(mapname, io_read);
-    if(!Handler) return 0;
+    if(!Handler)
+    {
+        printf("[DERBY] ERRO: Nao foi possivel abrir lista de mapas: %s", mapname);
+        return 0;
+    }
     TOTAL_DERBYS = 0;
-    for(new i = 0; i != MAX_DERBYS; i++) DERBY_FILENAMES[i] = "";
+    for(new i = 0; i != MAX_DERBYS; i++)
+    {
+        DERBY_FILENAMES[i] = "";
+        DERBY_OBJFILES[i] = "";
+    }
     while(fread(Handler, File_String))
     {
         if(TOTAL_DERBYS < MAX_DERBYS)
@@ -289,7 +303,119 @@ LoadDerbyNames(const mapname[])
         }
     }
     fclose(Handler);
+
+    // Carregar lista de objetos se existir
+    new File:ObjHandler = fopen("DERBY/lista_derby.txt", io_read);
+    if(ObjHandler)
+    {
+        new objIdx = 0;
+        while(fread(ObjHandler, File_String))
+        {
+            StripNewLine(File_String);
+            if(objIdx < MAX_DERBYS)
+            {
+                format(DERBY_OBJFILES[objIdx], 24, "%s", File_String);
+                objIdx++;
+            }
+        }
+        fclose(ObjHandler);
+        printf("[DERBY] Lista de objetos carregada: %d mapas com objetos", objIdx);
+    }
     return 1;
+}
+
+// Destroi objetos do mapa anterior
+DestroyDerbyObjects()
+{
+    for(new i = 0; i < DERBY_OBJECT_COUNT; i++)
+    {
+        if(DERBY_OBJECTS[i] != 0)
+        {
+            DestroyObject(DERBY_OBJECTS[i]);
+            DERBY_OBJECTS[i] = 0;
+        }
+    }
+    DERBY_OBJECT_COUNT = 0;
+}
+
+// Carrega objetos de um arquivo .txt
+LoadDerbyObjectsFromFile(const filename[])
+{
+    new File:Handler = fopen(filename, io_read);
+    if(!Handler)
+    {
+        printf("[DERBY] Nenhum arquivo de objetos encontrado: %s", filename);
+        return 0;
+    }
+
+    new count = 0;
+    new bool:firstLine = true;
+    while(fread(Handler, File_String))
+    {
+        StripNewLine(File_String);
+        if(firstLine)
+        {
+            // Primeira linha: NomeMapa, VeiculoID (ignorar, ja temos do .sfr)
+            firstLine = false;
+            continue;
+        }
+
+        // Formato: IDObjeto, X, Y, Z, RX, RY, RZ
+        new objectid;
+        new Float:ox, Float:oy, Float:oz, Float:orx, Float:ory, Float:orz;
+        if(sscanf(File_String, "p<,>dffffff", objectid, ox, oy, oz, orx, ory, orz) == 0)
+        {
+            if(count < MAX_DERBY_OBJECTS && objectid > 0)
+            {
+                DERBY_OBJECTS[count] = CreateObject(objectid, ox, oy, oz, orx, ory, orz, 300.0);
+                count++;
+            }
+        }
+    }
+    fclose(Handler);
+    DERBY_OBJECT_COUNT = count;
+    printf("[DERBY] Objetos criados: %d (arquivo: %s)", count, filename);
+    return 1;
+}
+
+// Tenta encontrar arquivo de objetos para o mapa atual
+LoadDerbyObjectsForMap(derbyid)
+{
+    // Primeiro, verificar se existe na lista_derby.txt
+    for(new i = 0; i < MAX_DERBYS; i++)
+    {
+        if(strlen(DERBY_OBJFILES[i]) > 0)
+        {
+            // Comparar nome base do mapa
+            LoadDerbyObjectsFromFile(DERBY_OBJFILES[i]);
+            // Nota: na implementacao ideal, associariamos .sfr ao .txt pelo nome
+            // Por agora, carrega baseado no ID do derby
+            break;
+        }
+    }
+
+    // Tentar encontrar arquivo .txt com mesmo nome base do .sfr
+    new objfile[32];
+    new base[24];
+    format(base, sizeof(base), "%s", DERBY_FILENAMES[derbyid]);
+
+    // Remover "DERBY/" do inicio
+    new offset = 0;
+    if(strfind(base, "DERBY/") == 0) offset = 6;
+
+    // Trocar .sfr por .txt
+    new len = strlen(base);
+    if(len > 4)
+    {
+        base[len-4] = '\0'; // Remove .sfr
+        format(objfile, sizeof(objfile), "DERBY/%s.txt", base[offset]);
+        if(fexist(objfile))
+        {
+            LoadDerbyObjectsFromFile(objfile);
+            return 1;
+        }
+    }
+    return 0;
 }
 
 LoadDerby(derbyid)
