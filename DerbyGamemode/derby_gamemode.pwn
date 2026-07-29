@@ -404,7 +404,7 @@ PlayerDerbyDead(playerid)
     GivePlayerScoreEx(playerid, score_gain);
 
     // Salvar estatisticas no banco
-    if(db_is_valid_handle(Database))
+    if(Database != DB:0)
     {
         format(DB_Query, sizeof(DB_Query), "UPDATE derby_stats SET losses = losses + 1, score_total = score_total + %d, last_played = CURRENT_TIMESTAMP WHERE player_name = '%s'",
             score_gain, PI[playerid][P_NAME]);
@@ -447,7 +447,7 @@ PlayerDerbyDead(playerid)
                 DI[D_DERBYGOD_VOTES][1] = 0;
 
                 // Salvar vitoria no banco
-                if(db_is_valid_handle(Database))
+                if(Database != DB:0)
                 {
                     format(DB_Query, sizeof(DB_Query), "UPDATE derby_stats SET wins = wins + 1, score_total = score_total + %d, last_played = CURRENT_TIMESTAMP WHERE player_name = '%s'",
                         money, PI[i][P_NAME]);
@@ -514,7 +514,7 @@ CheckDerby()
                         new money = DI[D_MAX_PRIZE] / DI[D_RUNNINGPLAYERS];
                         GivePlayerScoreEx(i, money);
 
-                        if(db_is_valid_handle(Database))
+                        if(Database != DB:0)
                         {
                             format(DB_Query, sizeof(DB_Query), "UPDATE derby_stats SET wins = wins + 1, score_total = score_total + %d, last_played = CURRENT_TIMESTAMP WHERE player_name = '%s'",
                                 money, PI[i][P_NAME]);
@@ -633,7 +633,7 @@ UpdatePlayersDerbyStatus()
                     CancelSelectTextDraw(players);
 
                     // Salvar participacao no banco
-                    if(db_is_valid_handle(Database))
+                    if(Database != DB:0)
                     {
                         format(DB_Query, sizeof(DB_Query), "UPDATE derby_stats SET plays = plays + 1, last_played = CURRENT_TIMESTAMP WHERE player_name = '%s'",
                             PI[players][P_NAME]);
@@ -1249,7 +1249,7 @@ CreateDerbyTextDraws()
 InitDatabase()
 {
     Database = db_open("derby.db");
-    if(!db_is_valid_handle(Database))
+    if(Database == DB:0)
     {
         printf("[DERBY] ERRO: Nao foi possivel abrir o banco de dados!");
         return 0;
@@ -1270,7 +1270,7 @@ InitDatabase()
 
 RegisterPlayerStats(playerid)
 {
-    if(!db_is_valid_handle(Database)) return 0;
+    if(Database == DB:0) return 0;
     format(DB_Query, sizeof(DB_Query), "INSERT OR IGNORE INTO derby_stats (player_name) VALUES ('%s')", PI[playerid][P_NAME]);
     db_query(Database, DB_Query);
     return 1;
@@ -1325,7 +1325,7 @@ public OnGameModeInit()
 
 public OnGameModeExit()
 {
-    if(db_is_valid_handle(Database))
+    if(Database != DB:0)
         db_close(Database);
     return 1;
 }
@@ -1629,8 +1629,9 @@ stock strtok(const string[], &index)
 // COMANDOS
 // =============================================================================
 
-dcmd_derby(playerid, params[])
+dcmd_derby(playerid, const params[])
 {
+    #pragma unused params
     if(PI[playerid][P_IN_DERBY])
         return SCM(playerid, COLOR_ORANGE, "| DERBY | Voce ja esta no Derby!");
 
@@ -1641,8 +1642,9 @@ dcmd_derby(playerid, params[])
     return 1;
 }
 
-dcmd_sair(playerid, params[])
+dcmd_sair(playerid, const params[])
 {
+    #pragma unused params
     if(!PI[playerid][P_IN_DERBY])
         return SCM(playerid, COLOR_ORANGE, "| DERBY | Voce nao esta no Derby!");
 
@@ -1654,9 +1656,10 @@ dcmd_sair(playerid, params[])
     return 1;
 }
 
-dcmd_stats(playerid, params[])
+dcmd_stats(playerid, const params[])
 {
-    if(!db_is_valid_handle(Database))
+    #pragma unused params
+    if(Database == DB:0)
         return SCM(playerid, COLOR_RED, "[ERRO]: Banco de dados indisponivel.");
 
     format(DB_Query, sizeof(DB_Query), "SELECT wins, losses, plays, score_total FROM derby_stats WHERE player_name = '%s'",
@@ -1688,9 +1691,10 @@ dcmd_stats(playerid, params[])
 }
 
 
-dcmd_top(playerid, params[])
+dcmd_top(playerid, const params[])
 {
-    if(!db_is_valid_handle(Database))
+    #pragma unused params
+    if(Database == DB:0)
         return SCM(playerid, COLOR_RED, "[ERRO]: Banco de dados indisponivel.");
 
     format(DB_Query, sizeof(DB_Query), "SELECT player_name, wins, score_total FROM derby_stats ORDER BY wins DESC LIMIT 10");
@@ -1724,8 +1728,9 @@ dcmd_top(playerid, params[])
     return 1;
 }
 
-dcmd_ajuda(playerid, params[])
+dcmd_ajuda(playerid, const params[])
 {
+    #pragma unused params
     SCM(playerid, COLOR_GREEN, "============ COMANDOS DO DERBY ============");
     SCM(playerid, COLOR_WHITE, "  /derby   - Entrar no Derby");
     SCM(playerid, COLOR_WHITE, "  /sair    - Sair do Derby");
@@ -1738,8 +1743,9 @@ dcmd_ajuda(playerid, params[])
     return 1;
 }
 
-dcmd_help(playerid, params[])
+dcmd_help(playerid, const params[])
 {
+    #pragma unused params
     return dcmd_ajuda(playerid, "");
 }
 
@@ -1748,8 +1754,9 @@ dcmd_help(playerid, params[])
 // ADMIN COMMANDS (Opcional)
 // =============================================================================
 
-dcmd_reloadmaps(playerid, params[])
+dcmd_reloadmaps(playerid, const params[])
 {
+    #pragma unused params
     if(!IsPlayerAdmin(playerid))
         return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON admins podem usar este comando.");
 
@@ -1760,8 +1767,9 @@ dcmd_reloadmaps(playerid, params[])
     return 1;
 }
 
-dcmd_skimap(playerid, params[])
+dcmd_skimap(playerid, const params[])
 {
+    #pragma unused params
     if(!IsPlayerAdmin(playerid))
         return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON admins podem usar este comando.");
 
@@ -1779,7 +1787,7 @@ dcmd_skimap(playerid, params[])
     return 1;
 }
 
-dcmd_setmap(playerid, params[])
+dcmd_setmap(playerid, const params[])
 {
     if(!IsPlayerAdmin(playerid))
         return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON admins podem usar este comando.");
