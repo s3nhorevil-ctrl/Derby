@@ -308,6 +308,7 @@ new const DerbyVehicles[][E_VEHICLE_INFO] = {
 stock GetPlayerNameEx(playerid, dest[], len)
 {
     GetPlayerName(playerid, dest, len);
+    return 1;
 }
 
 stock TimeToString(seconds, dest[], len)
@@ -315,6 +316,7 @@ stock TimeToString(seconds, dest[], len)
     new minutes = seconds / 60;
     seconds -= minutes * 60;
     format(dest, len, "%d:%02d", minutes, seconds);
+    return 1;
 }
 
 stock RandomEx(min, max)
@@ -341,6 +343,7 @@ stock GetVehicleNameByModel(modelid, dest[], len)
             break;
         }
     }
+    return 1;
 }
 
 stock GetVehicleModelByIndex(index)
@@ -382,19 +385,27 @@ stock DestroyVehicleSafe(vehicleid)
 
 stock GetModeName(mode, dest[], len)
 {
-    if(mode == MODE_FUN) format(dest, len, "FUN");
-    else if(mode == MODE_TRAINING) format(dest, len, "Treinamento");
-    else if(mode == MODE_CLA_VS_CLA) format(dest, len, "CLA vs CLA");
-    else format(dest, len, "Desconhecido");
+    switch(mode)
+    {
+        case MODE_FUN: strmid(dest, "FUN", 0, 3, len);
+        case MODE_TRAINING: strmid(dest, "Treinamento", 0, 11, len);
+        case MODE_CLA_VS_CLA: strmid(dest, "CLA vs CLA", 0, 10, len);
+        default: strmid(dest, "Desconhecido", 0, 12, len);
+    }
+    return 1;
 }
 
 stock GetRoomStateName(state, dest[], len)
 {
-    if(state == ROOM_STATE_EMPTY) format(dest, len, "Vazia");
-    else if(state == ROOM_STATE_LOBBY) format(dest, len, "Aguardando");
-    else if(state == ROOM_STATE_COUNTDOWN) format(dest, len, "Iniciando");
-    else if(state == ROOM_STATE_RUNNING) format(dest, len, "Em Partida");
-    else if(state == ROOM_STATE_ROUND_END) format(dest, len, "Fim de Round");
-    else if(state == ROOM_STATE_FINISHED) format(dest, len, "Finalizada");
-    else format(dest, len, "---");
+    switch(state)
+    {
+        case ROOM_STATE_EMPTY: strmid(dest, "Vazia", 0, 5, len);
+        case ROOM_STATE_LOBBY: strmid(dest, "Aguardando", 0, 10, len);
+        case ROOM_STATE_COUNTDOWN: strmid(dest, "Iniciando", 0, 9, len);
+        case ROOM_STATE_RUNNING: strmid(dest, "Em Partida", 0, 10, len);
+        case ROOM_STATE_ROUND_END: strmid(dest, "Fim de Round", 0, 12, len);
+        case ROOM_STATE_FINISHED: strmid(dest, "Finalizada", 0, 10, len);
+        default: strmid(dest, "---", 0, 3, len);
+    }
+    return 1;
 }
