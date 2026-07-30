@@ -83,7 +83,7 @@ public AntiAFKCheck()
     {
         if(!IsPlayerConnected(i)) continue;
         if(PlayerData[i][PL_ROOM_ID] == INVALID_ROOM_ID) continue;
-        if(PlayerData[i][PL_STATE] != PLAYER_STATE_ALIVE) continue;
+        if(PlayerData[i][PL_STATE] != PL_ST_ALIVE) continue;
         
         new roomid = PlayerData[i][PL_ROOM_ID];
         if(RoomData[roomid][ROOM_STATE] != ROOM_STATE_RUNNING) continue;

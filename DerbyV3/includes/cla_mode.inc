@@ -70,7 +70,7 @@ stock CheckClaRoundWinner(roomid)
     {
         if(!IsPlayerConnected(i)) continue;
         if(PlayerData[i][PL_ROOM_ID] != roomid) continue;
-        if(PlayerData[i][PL_STATE] != PLAYER_STATE_ALIVE) continue;
+        if(PlayerData[i][PL_STATE] != PL_ST_ALIVE) continue;
         
         if(PlayerData[i][PL_TEAM] == TEAM_ALPHA) alpha_alive++;
         else if(PlayerData[i][PL_TEAM] == TEAM_BETA) beta_alive++;

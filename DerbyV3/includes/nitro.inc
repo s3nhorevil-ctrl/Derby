@@ -34,7 +34,7 @@
 stock ActivateNitro(playerid)
 {
     if(PlayerData[playerid][PL_ROOM_ID] == INVALID_ROOM_ID) return 0;
-    if(PlayerData[playerid][PL_STATE] != PLAYER_STATE_ALIVE) return 0;
+    if(PlayerData[playerid][PL_STATE] != PL_ST_ALIVE) return 0;
     if(PlayerData[playerid][PL_NITRO_ACTIVE]) return 0;
     
     if(PlayerData[playerid][PL_NITRO_FUEL] < NITRO_MIN_TO_ACTIVATE)
@@ -83,7 +83,7 @@ stock DeactivateNitro(playerid)
 stock UpdateNitroForPlayer(playerid)
 {
     if(PlayerData[playerid][PL_ROOM_ID] == INVALID_ROOM_ID) return 0;
-    if(PlayerData[playerid][PL_STATE] != PLAYER_STATE_ALIVE) return 0;
+    if(PlayerData[playerid][PL_STATE] != PL_ST_ALIVE) return 0;
     
     if(PlayerData[playerid][PL_NITRO_ACTIVE])
     {
@@ -122,7 +122,7 @@ public NitroUpdateTimer()
     {
         if(!IsPlayerConnected(i)) continue;
         if(PlayerData[i][PL_ROOM_ID] == INVALID_ROOM_ID) continue;
-        if(PlayerData[i][PL_STATE] != PLAYER_STATE_ALIVE) continue;
+        if(PlayerData[i][PL_STATE] != PL_ST_ALIVE) continue;
         
         UpdateNitroForPlayer(i);
     }
@@ -136,7 +136,7 @@ public NitroUpdateTimer()
 stock HandleNitroKeyChange(playerid, newkeys, oldkeys)
 {
     if(PlayerData[playerid][PL_ROOM_ID] == INVALID_ROOM_ID) return 0;
-    if(PlayerData[playerid][PL_STATE] != PLAYER_STATE_ALIVE) return 0;
+    if(PlayerData[playerid][PL_STATE] != PL_ST_ALIVE) return 0;
     if(GetPlayerState(playerid) != 2) return 0; // PLAYER_STATE_DRIVER
     
     new roomid = PlayerData[playerid][PL_ROOM_ID];

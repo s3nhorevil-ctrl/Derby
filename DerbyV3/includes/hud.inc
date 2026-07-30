@@ -248,7 +248,7 @@ public VehicleHPUpdate()
     {
         if(!IsPlayerConnected(i)) continue;
         if(PlayerData[i][PL_ROOM_ID] == INVALID_ROOM_ID) continue;
-        if(PlayerData[i][PL_STATE] != PLAYER_STATE_ALIVE) continue;
+        if(PlayerData[i][PL_STATE] != PL_ST_ALIVE) continue;
         if(PlayerData[i][PL_VEHICLE_ID] == INVALID_VEHICLE_ID) continue;
         
         GetVehicleHealth(PlayerData[i][PL_VEHICLE_ID], hp);

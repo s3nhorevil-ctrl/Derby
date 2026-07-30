@@ -21,7 +21,7 @@ enum E_ROOM_CREATION
     RC_VEHICLE,
     RC_VEHICLE_INDEX,
     RC_MAP_COUNT,
-    RC_SELECTED_MAPS[MAX_ROOM_MAPS],
+    RC_SELECTED_MAPS[50],
     RC_NAME[32],
     RC_MAP_PAGE
 };
@@ -60,15 +60,20 @@ stock ShowRoomList(playerid)
     {
         if(RoomData[i][ROOM_STATE] == ROOM_STATE_EMPTY) continue;
         
-        new lock[4] = "";
-        if(RoomData[i][ROOM_PRIVATE]) lock = "[P]";
+        new lock[4];
+        if(RoomData[i][ROOM_PRIVATE]) format(lock, sizeof(lock), "[P]");
+        else lock[0] = '\0';
+        
+        new modename[20], statename[20];
+        format(modename, sizeof(modename), "%s", GetModeName(RoomData[i][ROOM_MODE]));
+        format(statename, sizeof(statename), "%s", GetRoomStateName(RoomData[i][ROOM_STATE]));
         
         format(line, sizeof(line), "%s%s\t%s\t%d/%d\t%s\n",
             lock, RoomData[i][ROOM_NAME],
-            GetModeName(RoomData[i][ROOM_MODE]),
+            modename,
             RoomData[i][ROOM_PLAYER_COUNT],
             RoomData[i][ROOM_MAX_PLAYERS],
-            GetRoomStateName(RoomData[i][ROOM_STATE]));
+            statename);
         strcat(str, line);
         count++;
     }

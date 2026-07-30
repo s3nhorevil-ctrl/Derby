@@ -126,7 +126,7 @@ stock GetRoomAliveCount(roomid)
     new count = 0;
     for(new i = 0; i < MAX_PLAYERS; i++)
     {
-        if(IsPlayerConnected(i) && PlayerData[i][PL_ROOM_ID] == roomid && PlayerData[i][PL_STATE] == PLAYER_STATE_ALIVE)
+        if(IsPlayerConnected(i) && PlayerData[i][PL_ROOM_ID] == roomid && PlayerData[i][PL_STATE] == PL_ST_ALIVE)
             count++;
     }
     return count;

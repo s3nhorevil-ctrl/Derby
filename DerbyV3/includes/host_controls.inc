@@ -343,7 +343,7 @@ stock CancelRoomMatch(roomid)
         if(GetPlayerState(i) == 9) // spectating
             TogglePlayerSpectating(i, false);
         
-        PlayerData[i][PL_STATE] = PLAYER_STATE_LOBBY;
+        PlayerData[i][PL_STATE] = PL_ST_LOBBY;
         PlayerData[i][PL_NITRO_ACTIVE] = false;
         HideRoomHUD(i);
     }
