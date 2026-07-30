@@ -305,17 +305,17 @@ new const DerbyVehicles[][E_VEHICLE_INFO] = {
 // FUNCOES UTILITARIAS
 // =============================================================================
 
-stock GetPlayerNameEx(playerid, dest[], len)
+stock GetPlayerNameEx(playerid, dest[])
 {
-    GetPlayerName(playerid, dest, len);
+    GetPlayerName(playerid, dest, MAX_PLAYER_NAME);
     return 1;
 }
 
-stock TimeToString(seconds, dest[], len)
+stock TimeToString(seconds, dest[])
 {
     new minutes = seconds / 60;
     seconds -= minutes * 60;
-    format(dest, len, "%d:%02d", minutes, seconds);
+    format(dest, 16, "%d:%02d", minutes, seconds);
     return 1;
 }
 
@@ -332,14 +332,14 @@ stock StripNewLine(string[])
     return 1;
 }
 
-stock GetVehicleNameByModel(modelid, dest[], len)
+stock GetVehicleNameByModel(modelid, dest[])
 {
-    format(dest, len, "Desconhecido");
+    strmid(dest, "Desconhecido", 0, 12, 24);
     for(new i = 0; i < TOTAL_DERBY_VEHICLES; i++)
     {
         if(DerbyVehicles[i][VEH_MODEL] == modelid)
         {
-            format(dest, len, "%s", DerbyVehicles[i][VEH_NAME]);
+            format(dest, 24, "%s", DerbyVehicles[i][VEH_NAME]);
             break;
         }
     }
@@ -383,29 +383,29 @@ stock DestroyVehicleSafe(vehicleid)
     }
 }
 
-stock GetModeName(mode, dest[], len)
+stock GetModeName(mode, dest[])
 {
     switch(mode)
     {
-        case MODE_FUN: strmid(dest, "FUN", 0, 3, len);
-        case MODE_TRAINING: strmid(dest, "Treinamento", 0, 11, len);
-        case MODE_CLA_VS_CLA: strmid(dest, "CLA vs CLA", 0, 10, len);
-        default: strmid(dest, "Desconhecido", 0, 12, len);
+        case MODE_FUN: strmid(dest, "FUN", 0, 3, 20);
+        case MODE_TRAINING: strmid(dest, "Treinamento", 0, 11, 20);
+        case MODE_CLA_VS_CLA: strmid(dest, "CLA vs CLA", 0, 10, 20);
+        default: strmid(dest, "Desconhecido", 0, 12, 20);
     }
     return 1;
 }
 
-stock GetRoomStateName(state, dest[], len)
+stock GetRoomStateName(state, dest[])
 {
     switch(state)
     {
-        case ROOM_STATE_EMPTY: strmid(dest, "Vazia", 0, 5, len);
-        case ROOM_STATE_LOBBY: strmid(dest, "Aguardando", 0, 10, len);
-        case ROOM_STATE_COUNTDOWN: strmid(dest, "Iniciando", 0, 9, len);
-        case ROOM_STATE_RUNNING: strmid(dest, "Em Partida", 0, 10, len);
-        case ROOM_STATE_ROUND_END: strmid(dest, "Fim de Round", 0, 12, len);
-        case ROOM_STATE_FINISHED: strmid(dest, "Finalizada", 0, 10, len);
-        default: strmid(dest, "---", 0, 3, len);
+        case ROOM_STATE_EMPTY: strmid(dest, "Vazia", 0, 5, 20);
+        case ROOM_STATE_LOBBY: strmid(dest, "Aguardando", 0, 10, 20);
+        case ROOM_STATE_COUNTDOWN: strmid(dest, "Iniciando", 0, 9, 20);
+        case ROOM_STATE_RUNNING: strmid(dest, "Em Partida", 0, 10, 20);
+        case ROOM_STATE_ROUND_END: strmid(dest, "Fim de Round", 0, 12, 20);
+        case ROOM_STATE_FINISHED: strmid(dest, "Finalizada", 0, 10, 20);
+        default: strmid(dest, "---", 0, 3, 20);
     }
     return 1;
 }
