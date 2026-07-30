@@ -75,14 +75,9 @@ stock IsPlayerPaused(playerid)
 #define DLG_MODO            (9100)
 #define DLG_CLA_CONFIG      (9101)
 #define DLG_CLA_MAPA        (9102)
-#define DLG_CLA_TEMPO       (9103)
-#define DLG_CLA_ROUNDS      (9104)
-#define DLG_CLA_COR1        (9105)
-#define DLG_CLA_COR2        (9106)
-#define DLG_CLA_VEICULO     (9107)
-#define DLG_CLA_TIME        (9108)
-#define DLG_CLA_PLAYERS     (9109)
-#define DLG_CLA_SETTEAM     (9110)
+#define DLG_CLA_ROUNDS      (9103)
+#define DLG_CLA_VEICULO     (9104)
+#define DLG_CLA_MEMBERS     (9105)
 
 #define SCM SendClientMessage
 #define SCMToAll SendClientMessageToAll
@@ -118,27 +113,7 @@ enum
     PD_SPECTATE
 };
 
-// Modos de jogo do servidor
-enum
-{
-    MODO_FUN,
-    MODO_CLA
-};
 
-// Configuracao do modo CLA VS CLA
-enum CLAINFO
-{
-    CL_CONFIGURADO,
-    CL_RODANDO,
-    CL_MAPA,
-    CL_TEMPO,
-    CL_ROUNDS,
-    CL_ROUND_ATUAL,
-    CL_VEICULO,
-    CL_COR[2],
-    CL_PONTOS[2],
-    CL_ADMIN
-};
 
 enum DINFO
 {
@@ -176,7 +151,6 @@ enum PINFO
     P_DERBY_SPECTATEPLAYER,
     bool:P_DERBY_VOTED,
     bool:P_IN_DERBY,
-    P_CLA,              // -1 = nenhum, 0 = CLA 1, 1 = CLA 2
     P_SCORE,
     P_TIMER_PAUSE
 };
@@ -201,14 +175,7 @@ new VW_TOTAL;
 // Nome amigavel de cada mapa (lido do cabecalho do .sfr)
 new DERBY_MAPNAME[MAX_DERBYS][24];
 
-// Modo atual do servidor
-new DERBY_MODO = MODO_FUN;
 
-// Estado do CLA VS CLA
-new CL[CLAINFO];
-
-// Jogador selecionado pelo admin na tela de gerenciamento de times
-new ClaSelPlayer[MAX_PLAYERS];
 
 // TextDraws
 new Text:TD_DERBY[9];
@@ -242,21 +209,7 @@ forward HideDerbyMessage();
 forward GodDerbyTimer();
 forward AntiAFKTimer();
 
-// --- modo CLA VS CLA ---
-forward ClaNextRoundTimer();
-forward ClaFinishTimer();
-forward ClaCleanupTimer();
-forward ClaAfterDeath(playerid);
-forward ClaCheckRoundEnd();
-forward ClaEndRound(team);
-forward ClaCountAlive(team);
-forward ClaCountTeam(team);
-forward ClaStopAll(const motivo[]);
-forward ClaResetConfig();
-forward ClaJoin(playerid, team);
-forward ClaShowConfig(playerid);
-forward ClaShowPlayerList(playerid);
-forward ShowModeSelect(playerid);
+
 
 // =============================================================================
 // FUNCOES UTILITARIAS
@@ -681,13 +634,6 @@ PlayerDerbyDead(playerid)
 
     DI[D_RUNNINGPLAYERS] -= 1;
 
-    // No modo CLA VS CLA o fim de round e decidido por equipe
-    if(DERBY_MODO == MODO_CLA)
-    {
-        ClaAfterDeath(playerid);
-        return 1;
-    }
-
     // Ninguem sobrou (partida solo) -> encerra e troca de mapa
     if(DI[D_RUNNINGPLAYERS] <= 0)
     {
@@ -866,14 +812,10 @@ UpdatePlayersDerbyStatus()
                     SetPlayerWeather(players, DI[D_WEATHER]);
                     DerbyAwaySeconds[players] = 0;
 
-                    // Votacao de GodCar existe apenas no MODO FUN
-                    if(DERBY_MODO == MODO_FUN)
-                    {
-                        for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
-                            TextDrawShowForPlayer(players, TD_DERBY_GodCar[i]);
-                        if(!PI[players][P_DERBY_VOTED])
-                            SelectTextDraw(players, 0x999999FF);
-                    }
+                    for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
+                        TextDrawShowForPlayer(players, TD_DERBY_GodCar[i]);
+                    if(!PI[players][P_DERBY_VOTED])
+                        SelectTextDraw(players, 0x999999FF);
                 }
             }
         }
@@ -916,16 +858,6 @@ UpdatePlayersDerbyStatus()
                         TextDrawHideForPlayer(players, TD_DERBY_GodCar[x]);
                     CancelSelectTextDraw(players);
 
-                    // Placar do CLA VS CLA na tela
-                    if(DERBY_MODO == MODO_CLA)
-                    {
-                        new sc[128];
-                        format(sc, sizeof(sc), "~w~round ~y~%d~w~/~y~%d~n~~w~cla1 ~y~%d ~w~x ~y~%d ~w~cla2",
-                            CL[CL_ROUND_ATUAL], CL[CL_ROUNDS], CL[CL_PONTOS][0], CL[CL_PONTOS][1]);
-                        TextDrawSetString(TD_DerbyMessage, sc);
-                        TextDrawShowForPlayer(players, TD_DerbyMessage);
-                    }
-
                     // Salvar participacao no banco
                     if(Database != DB:0)
                     {
@@ -967,13 +899,10 @@ UpdatePlayerDerbyStatus(playerid)
             SetPlayerWeather(playerid, DI[D_WEATHER]);
             DerbyAwaySeconds[playerid] = 0;
 
-            if(DERBY_MODO == MODO_FUN)
-            {
-                for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
-                    TextDrawShowForPlayer(playerid, TD_DERBY_GodCar[i]);
-                if(!PI[playerid][P_DERBY_VOTED])
-                    SelectTextDraw(playerid, 0x999999FF);
-            }
+            for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
+                TextDrawShowForPlayer(playerid, TD_DERBY_GodCar[i]);
+            if(!PI[playerid][P_DERBY_VOTED])
+                SelectTextDraw(playerid, 0x999999FF);
         }
         case DERBY_RUNNING:
         {
@@ -1014,17 +943,7 @@ public NextDerbyStatus()
     {
         case DERBY_CLOSED:
         {
-            if(DERBY_MODO == MODO_CLA)
-            {
-                if(!LoadDerby(CL[CL_MAPA]))
-                {
-                    print("[DERBY] CLA: mapa escolhido e invalido.");
-                    return 1;
-                }
-                DI[D_ID]      = CL[CL_MAPA];
-                DI[D_VEHICLE] = CL[CL_VEICULO];
-            }
-            else if(!LoadNextValidDerby(DI[D_ID]))
+            if(!LoadNextValidDerby(DI[D_ID]))
             {
                 print("[DERBY] Nao foi possivel iniciar: nenhum mapa valido.");
                 return 1;
@@ -1040,16 +959,13 @@ public NextDerbyStatus()
 
             TextDrawSetString(TD_DERBY_GodCar[3], "SIM_GOD_CAR:_0~n~NAO_GOD_CAR:_0~n~_");
 
-            if(DERBY_MODO == MODO_FUN)
+            foreach(players)
             {
-                foreach(players)
+                if(PI[players][P_IN_DERBY])
                 {
-                    if(PI[players][P_IN_DERBY])
-                    {
-                        for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
-                            TextDrawShowForPlayer(players, TD_DERBY_GodCar[i]);
-                        SelectTextDraw(players, 0x999999FF);
-                    }
+                    for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
+                        TextDrawShowForPlayer(players, TD_DERBY_GodCar[i]);
+                    SelectTextDraw(players, 0x999999FF);
                 }
             }
 
@@ -1057,21 +973,12 @@ public NextDerbyStatus()
         }
         case DERBY_RUNNING:
         {
-            if(DERBY_MODO == MODO_CLA)
+            new nextid = DI[D_ID] + 1;
+            if(nextid >= TOTAL_DERBYS) nextid = 0;
+            if(!LoadNextValidDerby(nextid))
             {
-                if(!LoadDerby(CL[CL_MAPA])) return 1;
-                DI[D_ID]      = CL[CL_MAPA];
-                DI[D_VEHICLE] = CL[CL_VEICULO];
-            }
-            else
-            {
-                new nextid = DI[D_ID] + 1;
-                if(nextid >= TOTAL_DERBYS) nextid = 0;
-                if(!LoadNextValidDerby(nextid))
-                {
-                    print("[DERBY] Nao foi possivel trocar de mapa.");
-                    return 1;
-                }
+                print("[DERBY] Nao foi possivel trocar de mapa.");
+                return 1;
             }
 
             for(new i; i < sizeof(TD_DERBY); ++i)
@@ -1086,16 +993,13 @@ public NextDerbyStatus()
 
             TextDrawSetString(TD_DERBY_GodCar[3], "SIM_GOD_CAR:_0~n~NAO_GOD_CAR:_0~n~_");
 
-            if(DERBY_MODO == MODO_FUN)
+            foreach(players)
             {
-                foreach(players)
+                if(PI[players][P_IN_DERBY])
                 {
-                    if(PI[players][P_IN_DERBY])
-                    {
-                        for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
-                            TextDrawShowForPlayer(players, TD_DERBY_GodCar[i]);
-                        SelectTextDraw(players, 0x999999FF);
-                    }
+                    for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
+                        TextDrawShowForPlayer(players, TD_DERBY_GodCar[i]);
+                    SelectTextDraw(players, 0x999999FF);
                 }
             }
 
@@ -1116,7 +1020,7 @@ public NextDerbyStatus()
             DI[D_MAX_PRIZE] = 1 * DI[D_PLAYERS];
             DI[D_MAX2_PRIZE] = 1 + DI[D_PLAYERS];
             DI[D_RUNNINGPLAYERS] = DI[D_PLAYERS];
-            DI[D_TIMEOUT_COUNTER] = (DERBY_MODO == MODO_CLA) ? CL[CL_TEMPO] : DERBY_TIMEOUT_SECONDS;
+            DI[D_TIMEOUT_COUNTER] = DERBY_TIMEOUT_SECONDS;
             KillTimer(DI[D_TIMEOUT_TIMER]);
             DI[D_TIMEOUT_TIMER] = SetTimer("DerbyTimeOutCountdown", 1000, true);
             DI[D_TICKCOUNT] = gettime();
@@ -1158,21 +1062,11 @@ public DerbyTimeOutCountdown()
             if(IsPlayerPaused(p))
             {
                 new remov[128];
-                if(DERBY_MODO == MODO_CLA)
-                {
-                    SCM(p, COLOR_INFO, "| CLA | {FFFFFF}Voce entrou em ESC e foi eliminado do round.");
-                    format(remov, sizeof(remov), "| CLA | %s (%i) entrou em ESC e foi eliminado.", PI[p][P_NAME], p);
-                    SendMessageToAllDerby(COLOR_GREEN, remov);
-                    PlayerDerbyDead(p);
-                }
-                else
-                {
-                    SCM(p, COLOR_INFO, "| MODO | {FFFFFF}Voce foi removido do derby por entrar em ESC.");
-                    RemovePlayerFromDerby(p);
-                    JoinPlayerDerby(p);
-                    format(remov, sizeof(remov), "| DERBY | %s (%i) Foi removido por ficar em ESC.", PI[p][P_NAME], p);
-                    SendMessageToAllDerby(COLOR_GREEN, remov);
-                }
+                SCM(p, COLOR_INFO, "| MODO | {FFFFFF}Voce foi removido do derby por entrar em ESC.");
+                RemovePlayerFromDerby(p);
+                JoinPlayerDerby(p);
+                format(remov, sizeof(remov), "| DERBY | %s (%i) Foi removido por ficar em ESC.", PI[p][P_NAME], p);
+                SendMessageToAllDerby(COLOR_GREEN, remov);
             }
         }
     }
@@ -1181,17 +1075,6 @@ public DerbyTimeOutCountdown()
     if(DI[D_TIMEOUT_COUNTER] < 0)
     {
         KillTimer(DI[D_TIMEOUT_TIMER]);
-
-        // No CLA VS CLA quem tiver mais sobreviventes ganha o round
-        if(DERBY_MODO == MODO_CLA)
-        {
-            new a0 = ClaCountAlive(0), a1 = ClaCountAlive(1);
-            SendMessageToAllDerby(COLOR_YELLOW, "| CLA | Tempo do round esgotado!");
-            if(a0 > a1)      ClaEndRound(0);
-            else if(a1 > a0) ClaEndRound(1);
-            else             ClaEndRound(-1);
-            return 1;
-        }
 
         if(DI[D_WINNER] == NO_WINNER)
         {
@@ -1329,19 +1212,9 @@ public AntiAFKTimer()
             }
             if(DerbyAwaySeconds[i] >= AFK_KICK_SECONDS)
             {
-                if(DERBY_MODO == MODO_CLA)
-                {
-                    // no CLA apenas elimina o jogador do round, sem remover da partida
-                    DerbyAwaySeconds[i] = 0;
-                    SCM(i, COLOR_YELLOW, "| CLA | Voce ficou parado e foi eliminado do round!");
-                    PlayerDerbyDead(i);
-                }
-                else
-                {
-                    SCM(i, COLOR_YELLOW, "| DERBY | Voce foi removido por ficar parado!");
-                    RemovePlayerFromDerby(i);
-                    JoinPlayerDerby(i);
-                }
+                SCM(i, COLOR_YELLOW, "| DERBY | Voce foi removido por ficar parado!");
+                RemovePlayerFromDerby(i);
+                JoinPlayerDerby(i);
             }
         }
     }
@@ -1442,12 +1315,6 @@ RemovePlayerFromDerby(playerid)
     format(string2, sizeof(string2), "{00FF00}| DERBY | %s (%i) saiu da sala (jogadores: %d/%d)",
         PI[playerid][P_NAME], playerid, DI[D_PLAYERS], MAX_DERBY_PLAYERS);
     SendMessageToAllDerby(COLOR_INFO, string2);
-
-    if(DERBY_MODO == MODO_CLA)
-    {
-        if(CL[CL_RODANDO]) ClaCheckRoundEnd();
-        return 1;
-    }
 
     CheckDerby();
     return 1;
@@ -1641,6 +1508,7 @@ RegisterPlayerStats(playerid)
 // =============================================================================
 
 #include "derby_objects.inc"
+#include "derby_cla.inc"
 
 main()
 {
@@ -1678,7 +1546,7 @@ public OnGameModeInit()
     LoadVirtualWorlds();
     LoadDerbyMapList();
     CacheMapNames();
-    ClaResetConfig();
+    ClaReset();
 
     // Inicializar banco de dados
     InitDatabase();
@@ -1713,9 +1581,7 @@ public OnPlayerConnect(playerid)
     PI[playerid][P_DERBY_STATUS] = PD_NORMAL;
     PI[playerid][P_DERBY_SPECTATEPLAYER] = 0;
     PI[playerid][P_DERBY_VOTED] = false;
-    PI[playerid][P_CLA] = -1;
     PI[playerid][P_SCORE] = 0;
-    ClaSelPlayer[playerid] = INVALID_PLAYER_ID;
     DerbyAwaySeconds[playerid] = 0;
     DerbyLastPosHash[playerid] = 0.0;
 
@@ -1735,8 +1601,16 @@ public OnPlayerConnect(playerid)
 public OnPlayerDisconnect(playerid, reason)
 {
     if(PI[playerid][P_IN_DERBY])
-    {
         RemovePlayerFromDerby(playerid);
+
+    // Sair do CLA se estava inscrito
+    if(CLA_INSCRITO[playerid])
+    {
+        if(CLA_VEHICLEID[playerid] != INVALID_VEHICLE_ID && IsValidVehicle(CLA_VEHICLEID[playerid]))
+            DestroyVehicle(CLA_VEHICLEID[playerid]);
+        CLA_INSCRITO[playerid] = false;
+        CLA_TEAM[playerid] = -1;
+        CLA_VEHICLEID[playerid] = INVALID_VEHICLE_ID;
     }
     return 1;
 }
@@ -1858,6 +1732,20 @@ public OnPlayerUpdate(playerid)
             }
         }
     }
+    // Verificar queda no CLA VS CLA
+    if(CLA_INSCRITO[playerid] && CLA[CLA_RODANDO] && !CLA[CLA_PAUSADO])
+    {
+        if(GetPlayerState(playerid) == PLAYER_STATE_DRIVER && CLA_VEHICLEID[playerid] != INVALID_VEHICLE_ID)
+        {
+            new Float:cx, Float:cy, Float:cz;
+            GetVehiclePos(CLA_VEHICLEID[playerid], cx, cy, cz);
+            if(cz <= DI[D_ZPOS])
+            {
+                ClaPlayerDied(playerid);
+            }
+        }
+    }
+
     return 1;
 }
 
@@ -1955,798 +1843,39 @@ public OnPlayerClickTextDraw(playerid, Text:clickedid)
 
 
 // =============================================================================
-// =====================   MODO CLA VS CLA   ===================================
-// Configurado apenas por quem esta logado no RCON.
-// Reutiliza o motor do Derby (mesmo spawn/eliminacao), mudando:
-//   - mapa fixo escolhido pelo admin
-//   - veiculo fixo escolhido pelo admin
-//   - tempo por round e quantidade de rounds
-//   - 2 clas com cores configuraveis
-// =============================================================================
-
-// Paleta de cores disponiveis para os clas
-new CLA_COR_NOME[8][16] = {"Vermelho", "Azul", "Verde", "Amarelo", "Laranja", "Roxo", "Rosa", "Ciano"};
-new CLA_COR_VAL[8] = {0xFF0000FF, 0x1E90FFFF, 0x00C000FF, 0xFFFF00FF, 0xFF8000FF, 0x9932CCFF, 0xFF69B4FF, 0x00FFFFFF};
-
-ClaResetConfig()
-{
-    CL[CL_CONFIGURADO] = 0;
-    CL[CL_RODANDO]     = 0;
-    CL[CL_MAPA]        = 0;
-    CL[CL_TEMPO]       = 120;
-    CL[CL_ROUNDS]      = 5;
-    CL[CL_ROUND_ATUAL] = 0;
-    CL[CL_VEICULO]     = 411;
-    CL[CL_COR][0]      = 0;   // Vermelho
-    CL[CL_COR][1]      = 1;   // Azul
-    CL[CL_PONTOS][0]   = 0;
-    CL[CL_PONTOS][1]   = 0;
-    CL[CL_ADMIN]       = INVALID_PLAYER_ID;
-    return 1;
-}
-
-// Nome amigavel do mapa (usa o cache lido dos arquivos)
-ClaMapName(mapid)
-{
-    new nome[24];
-    if(mapid >= 0 && mapid < TOTAL_DERBYS && strlen(DERBY_MAPNAME[mapid]) > 0)
-        format(nome, sizeof(nome), "%s", DERBY_MAPNAME[mapid]);
-    else
-        format(nome, sizeof(nome), "mapa %d", mapid);
-    return nome;
-}
-
-// Quantos jogadores vivos em um cla
-ClaCountAlive(team)
-{
-    new total = 0;
-    foreach(i)
-    {
-        if(PI[i][P_IN_DERBY] && PI[i][P_CLA] == team && PI[i][P_DERBY_STATUS] == PD_NORMAL)
-            total++;
-    }
-    return total;
-}
-
-// Quantos jogadores inscritos em um cla
-ClaCountTeam(team)
-{
-    new total = 0;
-    foreach(i)
-    {
-        if(PI[i][P_IN_DERBY] && PI[i][P_CLA] == team) total++;
-    }
-    return total;
-}
-
-// =============================================================================
-// TELA DE CONFIGURACAO (RCON)
-// =============================================================================
-
-ClaShowConfig(playerid)
-{
-    new info[1200], linha[160];
-
-    format(linha, sizeof(linha), "{FFFFFF}Mapa\t{00FF00}%s\n", ClaMapName(CL[CL_MAPA]));
-    strcat(info, linha);
-
-    format(linha, sizeof(linha), "{FFFFFF}Tempo por round\t{00FF00}%d segundos\n", CL[CL_TEMPO]);
-    strcat(info, linha);
-
-    format(linha, sizeof(linha), "{FFFFFF}Quantidade de rounds\t{00FF00}%d\n", CL[CL_ROUNDS]);
-    strcat(info, linha);
-
-    format(linha, sizeof(linha), "{FFFFFF}Veiculo (ID)\t{00FF00}%d\n", CL[CL_VEICULO]);
-    strcat(info, linha);
-
-    format(linha, sizeof(linha), "{FFFFFF}Cor do CLA 1\t{00FF00}%s\n", CLA_COR_NOME[ CL[CL_COR][0] ]);
-    strcat(info, linha);
-
-    format(linha, sizeof(linha), "{FFFFFF}Cor do CLA 2\t{00FF00}%s\n", CLA_COR_NOME[ CL[CL_COR][1] ]);
-    strcat(info, linha);
-
-    format(linha, sizeof(linha), "{00FFFF}Definir times dos jogadores\t{00FF00}CLA1: %d  |  CLA2: %d\n",
-        ClaCountTeam(0), ClaCountTeam(1));
-    strcat(info, linha);
-
-    format(linha, sizeof(linha), "{FFFF00}>> INICIAR PARTIDA\t{FFFF00}%d inscritos\n", DI[D_PLAYERS]);
-    strcat(info, linha);
-
-    strcat(info, "{FF0000}>> CANCELAR / RESETAR\t{FF0000}-\n");
-
-    ShowPlayerDialog(playerid, DLG_CLA_CONFIG, DIALOG_STYLE_TABLIST_HEADERS,
-        "CLA VS CLA - Configuracao\tValor atual", info, "Selecionar", "Fechar");
-    return 1;
-}
-
-ClaShowMapList(playerid)
-{
-    new info[4000], linha[64];
-    for(new i = 0; i < TOTAL_DERBYS; i++)
-    {
-        format(linha, sizeof(linha), "%d - %s\n", i, ClaMapName(i));
-        if(strlen(info) + strlen(linha) >= sizeof(info) - 2) break;
-        strcat(info, linha);
-    }
-    if(strlen(info) < 2) format(info, sizeof(info), "Nenhum mapa carregado\n");
-
-    ShowPlayerDialog(playerid, DLG_CLA_MAPA, DIALOG_STYLE_LIST,
-        "CLA VS CLA - Escolha o mapa", info, "Escolher", "Voltar");
-    return 1;
-}
-
-ClaShowColorList(playerid, team)
-{
-    new info[400], linha[48];
-    for(new i = 0; i < sizeof(CLA_COR_NOME); i++)
-    {
-        format(linha, sizeof(linha), "%s\n", CLA_COR_NOME[i]);
-        strcat(info, linha);
-    }
-    new titulo[48];
-    format(titulo, sizeof(titulo), "Cor do CLA %d", team + 1);
-    ShowPlayerDialog(playerid, (team == 0) ? DLG_CLA_COR1 : DLG_CLA_COR2,
-        DIALOG_STYLE_LIST, titulo, info, "Escolher", "Voltar");
-    return 1;
-}
-
-// =============================================================================
-// ADMIN DEFINE O TIME DE CADA JOGADOR
-// =============================================================================
-
-// Nome do cla de um jogador (para exibir na lista)
-ClaTeamLabel(playerid)
-{
-    new txt[24];
-    if(PI[playerid][P_CLA] == 0)      format(txt, sizeof(txt), "{00FF00}CLA 1");
-    else if(PI[playerid][P_CLA] == 1) format(txt, sizeof(txt), "{00FF00}CLA 2");
-    else                              format(txt, sizeof(txt), "{999999}sem time");
-    return txt;
-}
-
-// Lista todos os jogadores conectados para o admin distribuir nos times
-ClaShowPlayerList(playerid)
-{
-    new info[3500], linha[128];
-    new total = 0;
-
-    foreach(i)
-    {
-        format(linha, sizeof(linha), "%d\t{FFFFFF}%s\t%s\n", i, PI[i][P_NAME], ClaTeamLabel(i));
-        if(strlen(info) + strlen(linha) >= sizeof(info) - 2) break;
-        strcat(info, linha);
-        total++;
-    }
-
-    if(total == 0)
-    {
-        SCM(playerid, COLOR_ORANGE, "| CLA | Nenhum jogador conectado.");
-        return ClaShowConfig(playerid);
-    }
-
-    ShowPlayerDialog(playerid, DLG_CLA_PLAYERS, DIALOG_STYLE_TABLIST_HEADERS,
-        "ID\tJogador\tTime atual", info, "Definir", "Voltar");
-    return 1;
-}
-
-// Menu para escolher em qual time colocar o jogador selecionado
-ClaShowSetTeam(playerid, target)
-{
-    new info[300], titulo[64];
-
-    format(info, sizeof(info), "{FFFFFF}Colocar no {%06x}CLA 1{FFFFFF} (%s)\n{FFFFFF}Colocar no {%06x}CLA 2{FFFFFF} (%s)\n{FF0000}Remover da partida\n",
-        CLA_COR_VAL[ CL[CL_COR][0] ] >>> 8, CLA_COR_NOME[ CL[CL_COR][0] ],
-        CLA_COR_VAL[ CL[CL_COR][1] ] >>> 8, CLA_COR_NOME[ CL[CL_COR][1] ]);
-
-    format(titulo, sizeof(titulo), "Time de %s", PI[target][P_NAME]);
-
-    ShowPlayerDialog(playerid, DLG_CLA_SETTEAM, DIALOG_STYLE_LIST,
-        titulo, info, "Confirmar", "Voltar");
-    return 1;
-}
-
-// Aplica o time escolhido pelo admin
-ClaSetTeam(adminid, target, team)
-{
-    if(!IsPlayerConnected(target))
-        return SCM(adminid, COLOR_RED, "[ERRO]: Jogador nao esta mais conectado.");
-
-    // Remover da partida
-    if(team == -1)
-    {
-        if(PI[target][P_IN_DERBY]) RemovePlayerFromDerby(target);
-        PI[target][P_CLA] = -1;
-        SetPlayerColor(target, COLOR_WHITE);
-        SetPlayerTeam(target, NO_TEAM);
-        SpawnPlayer(target);
-
-        new m1[128];
-        format(m1, sizeof(m1), "| CLA | %s removeu voce da partida.", PI[adminid][P_NAME]);
-        SCM(target, COLOR_YELLOW, m1);
-        format(m1, sizeof(m1), "| CLA | %s foi removido da partida.", PI[target][P_NAME]);
-        SCM(adminid, COLOR_YELLOW, m1);
-        return 1;
-    }
-
-    DERBY_MODO = MODO_CLA;
-
-    // Ainda nao esta na partida -> inscreve
-    if(!PI[target][P_IN_DERBY])
-    {
-        ClaJoin(target, team);
-    }
-    else
-    {
-        PI[target][P_CLA] = team;
-        SetPlayerColor(target, CLA_COR_VAL[ CL[CL_COR][team] ]);
-        SetPlayerTeam(target, team);
-    }
-
-    new msg[144];
-    format(msg, sizeof(msg), "| CLA | %s colocou voce no {%06x}CLA %d{FFFFFF}.",
-        PI[adminid][P_NAME], CLA_COR_VAL[ CL[CL_COR][team] ] >>> 8, team + 1);
-    SCM(target, COLOR_WHITE, msg);
-
-    format(msg, sizeof(msg), "| CLA | %s definido para o CLA %d.", PI[target][P_NAME], team + 1);
-    SCM(adminid, COLOR_GREEN, msg);
-    return 1;
-}
-
-// =============================================================================
-// ENTRADA DOS JOGADORES NO CLA
-// =============================================================================
-
-ClaShowTeamSelect(playerid)
-{
-    new info[256];
-    format(info, sizeof(info), "{%06x}CLA 1{FFFFFF} (%s)\t%d jogadores\n{%06x}CLA 2{FFFFFF} (%s)\t%d jogadores\n",
-        CLA_COR_VAL[ CL[CL_COR][0] ] >>> 8, CLA_COR_NOME[ CL[CL_COR][0] ], ClaCountTeam(0),
-        CLA_COR_VAL[ CL[CL_COR][1] ] >>> 8, CLA_COR_NOME[ CL[CL_COR][1] ], ClaCountTeam(1));
-
-    ShowPlayerDialog(playerid, DLG_CLA_TIME, DIALOG_STYLE_TABLIST,
-        "CLA VS CLA - Escolha seu cla", info, "Entrar", "Cancelar");
-    return 1;
-}
-
-ClaJoin(playerid, team)
-{
-    if(PI[playerid][P_IN_DERBY])
-        return SCM(playerid, COLOR_ORANGE, "| CLA | Voce ja esta em uma partida. Use /sair primeiro.");
-
-    if(TOTAL_DERBYS <= 0)
-        return SCM(playerid, COLOR_RED, "[ERRO]: Nenhum mapa carregado.");
-
-    if(DI[D_PLAYERS] >= MAX_DERBY_PLAYERS)
-        return SCM(playerid, COLOR_RED, "[ERRO]: Partida lotada.");
-
-    DERBY_MODO = MODO_CLA;
-
-    DI[D_PLAYERS] += 1;
-    PI[playerid][P_IN_DERBY]        = true;
-    PI[playerid][P_CLA]            = team;
-    PI[playerid][P_DERBY_VEHICLEID] = INVALID_VEHICLE_ID;
-    PI[playerid][P_DERBY_STATUS]    = PD_NORMAL;
-    PI[playerid][P_DERBY_VOTED]     = true;   // sem votacao de GodCar no CLA
-    DerbyAwaySeconds[playerid]      = 0;
-
-    SetPlayerColor(playerid, CLA_COR_VAL[ CL[CL_COR][team] ]);
-    SetPlayerTeam(playerid, team);
-    SetPlayerArmour(playerid, 0.0);
-    SetPlayerHealth(playerid, 100.0);
-    ResetPlayerWeapons(playerid);
-    TextDrawShowForPlayer(playerid, TD_DerbyMessage);
-
-    new msg[144];
-    format(msg, sizeof(msg), "{FFFFFF}| CLA | %s entrou no {%06x}CLA %d{FFFFFF} (CLA1: %d | CLA2: %d)",
-        PI[playerid][P_NAME], CLA_COR_VAL[ CL[CL_COR][team] ] >>> 8, team + 1,
-        ClaCountTeam(0), ClaCountTeam(1));
-    SendMessageToAllDerby(COLOR_WHITE, msg);
-
-    if(CL[CL_RODANDO])
-    {
-        // partida em andamento -> entra assistindo
-        UpdatePlayerDerbyStatus(playerid);
-    }
-    else
-    {
-        SCM(playerid, COLOR_YELLOW, "| CLA | Aguardando o administrador iniciar a partida...");
-        TextDrawSetString(TD_DerbyMessage, "~y~cla vs cla~n~~w~aguardando admin");
-    }
-    return 1;
-}
-
-// =============================================================================
-// INICIAR / ROUNDS
-// =============================================================================
-
-ClaStart(playerid)
-{
-    if(TOTAL_DERBYS <= 0)
-        return SCM(playerid, COLOR_RED, "[ERRO]: Nenhum mapa carregado.");
-
-    if(CL[CL_VEICULO] < 400 || CL[CL_VEICULO] > 611)
-        return SCM(playerid, COLOR_RED, "[ERRO]: ID de veiculo invalido (400 a 611).");
-
-    if(DI[D_PLAYERS] < 1)
-        return SCM(playerid, COLOR_RED, "[ERRO]: Nenhum jogador inscrito. Peca para entrarem com /derby.");
-
-    DERBY_MODO         = MODO_CLA;
-    CL[CL_CONFIGURADO] = 1;
-    CL[CL_RODANDO]     = 1;
-    CL[CL_ROUND_ATUAL] = 1;
-    CL[CL_PONTOS][0]   = 0;
-    CL[CL_PONTOS][1]   = 0;
-    CL[CL_ADMIN]       = playerid;
-
-    // aplica as cores atuais em todos
-    foreach(i)
-    {
-        if(PI[i][P_IN_DERBY] && PI[i][P_CLA] >= 0)
-        {
-            SetPlayerColor(i, CLA_COR_VAL[ CL[CL_COR][ PI[i][P_CLA] ] ]);
-            SetPlayerTeam(i, PI[i][P_CLA]);
-        }
-    }
-
-    new msg[144];
-    format(msg, sizeof(msg), "{FFFF00}| CLA VS CLA | Partida iniciada! Mapa: %s | %d rounds | %ds por round",
-        ClaMapName(CL[CL_MAPA]), CL[CL_ROUNDS], CL[CL_TEMPO]);
-    SendMessageToAllDerby(COLOR_YELLOW, msg);
-
-    // usa o motor normal: CLOSED -> WAIT (spawna) -> RUNNING
-    DI[D_STATUS] = DERBY_CLOSED;
-    NextDerbyStatus();
-    return 1;
-}
-
-// Placar em texto
-ClaScoreText()
-{
-    new txt[128];
-    format(txt, sizeof(txt), "~w~round ~y~%d~w~/~y~%d~n~~w~cla1 ~y~%d ~w~x ~y~%d ~w~cla2",
-        CL[CL_ROUND_ATUAL], CL[CL_ROUNDS], CL[CL_PONTOS][0], CL[CL_PONTOS][1]);
-    return txt;
-}
-
-// Encerra o round. team = 0/1 vencedor, -1 = empate
-ClaEndRound(team)
-{
-    if(!CL[CL_RODANDO]) return 0;
-
-    KillTimer(DI[D_TIMEOUT_TIMER]);
-    KillTimer(DI[D_NEXTDSTATUS_TIMER]);
-
-    new msg[160];
-    if(team == 0 || team == 1)
-    {
-        CL[CL_PONTOS][team] += 1;
-        format(msg, sizeof(msg), "{FFFF00}| CLA | Round %d vencido pelo {%06x}CLA %d{FFFF00}!  Placar: %d x %d",
-            CL[CL_ROUND_ATUAL], CLA_COR_VAL[ CL[CL_COR][team] ] >>> 8, team + 1,
-            CL[CL_PONTOS][0], CL[CL_PONTOS][1]);
-    }
-    else
-    {
-        format(msg, sizeof(msg), "{FFFF00}| CLA | Round %d terminou empatado. Placar: %d x %d",
-            CL[CL_ROUND_ATUAL], CL[CL_PONTOS][0], CL[CL_PONTOS][1]);
-    }
-    SendMessageToAllDerby(COLOR_YELLOW, msg);
-    TextDrawSetString(TD_DerbyMessage, ClaScoreText());
-
-    if(CL[CL_ROUND_ATUAL] >= CL[CL_ROUNDS])
-    {
-        SetTimer("ClaFinishTimer", 4000, false);
-        return 1;
-    }
-
-    CL[CL_ROUND_ATUAL] += 1;
-    SetTimer("ClaNextRoundTimer", 4000, false);
-    return 1;
-}
-
-// Verifica se algum cla foi eliminado
-ClaCheckRoundEnd()
-{
-    if(!CL[CL_RODANDO] || DI[D_STATUS] != DERBY_RUNNING) return 0;
-
-    new v0 = ClaCountAlive(0);
-    new v1 = ClaCountAlive(1);
-
-    if(v0 == 0 && v1 == 0) return ClaEndRound(-1);
-    if(v0 == 0) return ClaEndRound(1);
-    if(v1 == 0) return ClaEndRound(0);
-    return 0;
-}
-
-// Chamado quando um jogador e eliminado no modo CLA
-ClaAfterDeath(playerid)
-{
-    // coloca para assistir alguem vivo
-    new alvo = -1;
-    foreach(i)
-    {
-        if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL)
-        {
-            alvo = i;
-            break;
-        }
-    }
-
-    PI[playerid][P_DERBY_STATUS] = PD_SPECTATE;
-
-    if(alvo != -1 && IsValidVehicle(PI[alvo][P_DERBY_VEHICLEID]))
-    {
-        PI[playerid][P_DERBY_SPECTATEPLAYER] = alvo;
-        TogglePlayerSpectatingEx(playerid, true);
-        PlayerSpectateVehicle(playerid, PI[alvo][P_DERBY_VEHICLEID]);
-        TextDrawShowForPlayer(playerid, TD_ESPEC_DERBY);
-    }
-
-    ClaCheckRoundEnd();
-    return 1;
-}
-
-// Zera tudo e volta para o modo FUN
-ClaStopAll(const motivo[])
-{
-    // desliga o flag ANTES de remover ninguem para nao reentrar em ClaCheckRoundEnd
-    CL[CL_RODANDO] = 0;
-
-    KillTimer(DI[D_TIMEOUT_TIMER]);
-    KillTimer(DI[D_COUNTDOWN_TIMER]);
-    KillTimer(DI[D_NEXTDSTATUS_TIMER]);
-
-    new msg[144];
-    format(msg, sizeof(msg), "{FF0000}| CLA | %s", motivo);
-    SendMessageToAllDerby(COLOR_RED, msg);
-
-    foreach(i)
-    {
-        if(PI[i][P_IN_DERBY])
-        {
-            RemovePlayerFromDerby(i);
-            PI[i][P_CLA] = -1;
-            SetPlayerColor(i, COLOR_WHITE);
-            SetPlayerTeam(i, NO_TEAM);
-            SpawnPlayer(i);
-        }
-    }
-
-    ClaResetConfig();
-    DERBY_MODO = MODO_FUN;
-    CloseDerby();
-    return 1;
-}
-
-
-// =============================================================================
-// TIMERS DO MODO CLA
-// =============================================================================
-
-public ClaNextRoundTimer()
-{
-    if(!CL[CL_RODANDO]) return 1;
-
-    // libera slots e reativa todos os inscritos
-    for(new i = 0; i != sizeof(DERBY_SLOT_USED); i++) DERBY_SLOT_USED[i] = false;
-
-    foreach(i)
-    {
-        if(PI[i][P_IN_DERBY])
-        {
-            PI[i][P_DERBY_STATUS] = PD_NORMAL;
-            DerbyAwaySeconds[i] = 0;
-            TextDrawHideForPlayer(i, TD_ESPEC_DERBY);
-        }
-    }
-
-    new msg[96];
-    format(msg, sizeof(msg), "{FFFF00}| CLA | Preparando round %d de %d...", CL[CL_ROUND_ATUAL], CL[CL_ROUNDS]);
-    SendMessageToAllDerby(COLOR_YELLOW, msg);
-
-    DI[D_STATUS] = DERBY_CLOSED;
-    NextDerbyStatus();
-    return 1;
-}
-
-public ClaFinishTimer()
-{
-    new campeao = -1;
-    if(CL[CL_PONTOS][0] > CL[CL_PONTOS][1]) campeao = 0;
-    else if(CL[CL_PONTOS][1] > CL[CL_PONTOS][0]) campeao = 1;
-
-    new msg[176];
-    if(campeao == -1)
-    {
-        format(msg, sizeof(msg), "{FFFF00}| CLA VS CLA | FIM! Empate %d x %d", CL[CL_PONTOS][0], CL[CL_PONTOS][1]);
-        SendMessageToAllDerby(COLOR_YELLOW, msg);
-        TextDrawSetString(TD_DerbyMessage, "~y~empate!");
-    }
-    else
-    {
-        format(msg, sizeof(msg), "{FFFF00}| CLA VS CLA | FIM! {%06x}CLA %d{FFFF00} campeao com %d x %d",
-            CLA_COR_VAL[ CL[CL_COR][campeao] ] >>> 8, campeao + 1,
-            CL[CL_PONTOS][0], CL[CL_PONTOS][1]);
-        SendMessageToAllDerby(COLOR_YELLOW, msg);
-
-        new td[96];
-        format(td, sizeof(td), "~g~cla %d campeao!~n~~w~%d x %d", campeao + 1, CL[CL_PONTOS][0], CL[CL_PONTOS][1]);
-        TextDrawSetString(TD_DerbyMessage, td);
-
-        // premia os vencedores
-        foreach(i)
-        {
-            if(PI[i][P_IN_DERBY] && PI[i][P_CLA] == campeao)
-            {
-                GivePlayerScoreEx(i, 10);
-                PlayerPlaySoundEx(i, 1057, 0.0, 0.0, 0.0);
-                if(Database != DB:0)
-                {
-                    format(DB_Query, sizeof(DB_Query), "UPDATE derby_stats SET wins = wins + 1, score_total = score_total + 10, last_played = CURRENT_TIMESTAMP WHERE player_name = '%s'", PI[i][P_NAME]);
-                    db_query(Database, DB_Query);
-                }
-            }
-        }
-    }
-
-    SetTimer("ClaCleanupTimer", 6000, false);
-    return 1;
-}
-
-public ClaCleanupTimer()
-{
-    ClaStopAll("Partida encerrada. O servidor voltou para o MODO FUN.");
-    return 1;
-}
-
-
-// =============================================================================
-// TELA INICIAL DE ESCOLHA DE MODO (/derby)
-// =============================================================================
-
-ShowModeSelect(playerid)
-{
-    new info[512], linha[200];
-
-    format(linha, sizeof(linha), "{FFFFFF}MODO FUN\t{00FF00}%d jogando\t{CCCCCC}Mapas trocando automaticamente\n",
-        (DERBY_MODO == MODO_FUN) ? DI[D_PLAYERS] : 0);
-    strcat(info, linha);
-
-    if(CL[CL_RODANDO])
-    {
-        format(linha, sizeof(linha), "{FFFFFF}CLA VS CLA\t{FFFF00}EM ANDAMENTO\t{CCCCCC}Round %d/%d - %d x %d\n",
-            CL[CL_ROUND_ATUAL], CL[CL_ROUNDS], CL[CL_PONTOS][0], CL[CL_PONTOS][1]);
-    }
-    else if(IsPlayerAdmin(playerid))
-    {
-        format(linha, sizeof(linha), "{FFFFFF}CLA VS CLA\t{00FF00}CONFIGURAR\t{CCCCCC}Voce e RCON: pode configurar\n");
-    }
-    else
-    {
-        format(linha, sizeof(linha), "{FFFFFF}CLA VS CLA\t{FF0000}FECHADO\t{CCCCCC}Aguarde um admin configurar\n");
-    }
-    strcat(info, linha);
-
-    ShowPlayerDialog(playerid, DLG_MODO, DIALOG_STYLE_TABLIST_HEADERS,
-        "DERBY - Escolha o modo\tStatus\tInfo", info, "Selecionar", "Sair");
-    return 1;
-}
-
-// =============================================================================
-// RESPOSTAS DOS DIALOGOS
+// DIALOGOS
 // =============================================================================
 
 public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 {
-    switch(dialogid)
+    // Tela de escolha de modo
+    if(dialogid == DLG_MODO)
     {
-        // ------------------------- escolha do modo -------------------------
-        case DLG_MODO:
+        if(!response) return 1;
+        if(listitem == 0) // MODO FUN
         {
-            if(!response) return 1;
-
-            if(listitem == 0) // MODO FUN
-            {
-                if(CL[CL_RODANDO])
-                    return SCM(playerid, COLOR_RED, "[ERRO]: Existe um CLA VS CLA em andamento. Aguarde terminar.");
-
-                DERBY_MODO = MODO_FUN;
-                PI[playerid][P_CLA] = -1;
-                SetPlayerColor(playerid, COLOR_WHITE);
-                SetPlayerTeam(playerid, NO_TEAM);
-                JoinPlayerDerby(playerid);
-                return 1;
-            }
-
-            if(listitem == 1) // CLA VS CLA
-            {
-                if(CL[CL_RODANDO]) return ClaShowTeamSelect(playerid);
-                if(CL[CL_CONFIGURADO]) return ClaShowTeamSelect(playerid);
-
-                if(IsPlayerAdmin(playerid))
-                {
-                    CL[CL_ADMIN] = playerid;
-                    return ClaShowConfig(playerid);
-                }
-                return SCM(playerid, COLOR_ORANGE, "| CLA | Nenhuma partida configurada. Aguarde um administrador.");
-            }
+            if(PI[playerid][P_IN_DERBY])
+                return SCM(playerid, COLOR_ORANGE, "| DERBY | Voce ja esta no modo FUN!");
+            JoinPlayerDerby(playerid);
             return 1;
         }
-
-        // ------------------------- config principal -------------------------
-        case DLG_CLA_CONFIG:
+        if(listitem == 1) // CLA VS CLA
         {
-            if(!response) return 1;
-            if(!IsPlayerAdmin(playerid))
-                return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON pode configurar.");
-
-            switch(listitem)
-            {
-                case 0: ClaShowMapList(playerid);
-                case 1:
-                {
-                    ShowPlayerDialog(playerid, DLG_CLA_TEMPO, DIALOG_STYLE_INPUT,
-                        "Tempo por round",
-                        "Digite o tempo de cada round em SEGUNDOS.\n\nMinimo: 30   Maximo: 900\n\nExemplo: 120", "Salvar", "Voltar");
-                }
-                case 2:
-                {
-                    ShowPlayerDialog(playerid, DLG_CLA_ROUNDS, DIALOG_STYLE_INPUT,
-                        "Quantidade de rounds",
-                        "Digite quantos rounds a partida tera.\n\nMinimo: 1   Maximo: 30\n\nExemplo: 5", "Salvar", "Voltar");
-                }
-                case 3:
-                {
-                    ShowPlayerDialog(playerid, DLG_CLA_VEICULO, DIALOG_STYLE_INPUT,
-                        "Veiculo da partida",
-                        "{FFFFFF}DIGITE O ID DO VEICULO\n\n{CCCCCC}Faixa valida: 400 a 611\n\nSugestoes:\n411 Infernus | 451 Turismo | 495 Sandking\n560 Sultan | 444 Monster | 541 Bullet", "Salvar", "Voltar");
-                }
-                case 4: ClaShowColorList(playerid, 0);
-                case 5: ClaShowColorList(playerid, 1);
-                case 6: ClaShowPlayerList(playerid);
-                case 7: ClaStart(playerid);
-                case 8:
-                {
-                    if(CL[CL_RODANDO]) ClaStopAll("Partida cancelada pelo administrador.");
-                    else
-                    {
-                        ClaResetConfig();
-                        SCM(playerid, COLOR_YELLOW, "| CLA | Configuracao resetada.");
-                        ClaShowConfig(playerid);
-                    }
-                }
-            }
+            ClaEntrar(playerid);
             return 1;
         }
+        return 1;
+    }
 
-        // ------------------------- escolha do mapa -------------------------
-        case DLG_CLA_MAPA:
-        {
-            if(!response) return ClaShowConfig(playerid);
-            if(listitem >= 0 && listitem < TOTAL_DERBYS) CL[CL_MAPA] = listitem;
-            return ClaShowConfig(playerid);
-        }
-
-        // ------------------------- tempo do round -------------------------
-        case DLG_CLA_TEMPO:
-        {
-            if(!response) return ClaShowConfig(playerid);
-            new v = strval(inputtext);
-            if(v < 30 || v > 900)
-            {
-                SCM(playerid, COLOR_RED, "[ERRO]: Valor invalido. Use entre 30 e 900 segundos.");
-                return ClaShowConfig(playerid);
-            }
-            CL[CL_TEMPO] = v;
-            return ClaShowConfig(playerid);
-        }
-
-        // ------------------------- quantidade de rounds -------------------------
-        case DLG_CLA_ROUNDS:
-        {
-            if(!response) return ClaShowConfig(playerid);
-            new v = strval(inputtext);
-            if(v < 1 || v > 30)
-            {
-                SCM(playerid, COLOR_RED, "[ERRO]: Valor invalido. Use entre 1 e 30 rounds.");
-                return ClaShowConfig(playerid);
-            }
-            CL[CL_ROUNDS] = v;
-            return ClaShowConfig(playerid);
-        }
-
-        // ------------------------- id do veiculo -------------------------
-        case DLG_CLA_VEICULO:
-        {
-            if(!response) return ClaShowConfig(playerid);
-            new v = strval(inputtext);
-            if(v < 400 || v > 611)
-            {
-                SCM(playerid, COLOR_RED, "[ERRO]: ID de veiculo invalido. Use entre 400 e 611.");
-                return ClaShowConfig(playerid);
-            }
-            CL[CL_VEICULO] = v;
-            return ClaShowConfig(playerid);
-        }
-
-        // ------------------------- cores -------------------------
-        case DLG_CLA_COR1:
-        {
-            if(!response) return ClaShowConfig(playerid);
-            if(listitem == CL[CL_COR][1])
-            {
-                SCM(playerid, COLOR_RED, "[ERRO]: Essa cor ja e do CLA 2. Escolha outra.");
-                return ClaShowConfig(playerid);
-            }
-            CL[CL_COR][0] = listitem;
-            return ClaShowConfig(playerid);
-        }
-        case DLG_CLA_COR2:
-        {
-            if(!response) return ClaShowConfig(playerid);
-            if(listitem == CL[CL_COR][0])
-            {
-                SCM(playerid, COLOR_RED, "[ERRO]: Essa cor ja e do CLA 1. Escolha outra.");
-                return ClaShowConfig(playerid);
-            }
-            CL[CL_COR][1] = listitem;
-            return ClaShowConfig(playerid);
-        }
-
-        // ------------------------- jogador escolhe o cla -------------------------
-        case DLG_CLA_TIME:
-        {
-            if(!response) return 1;
-            if(listitem == 0 || listitem == 1) ClaJoin(playerid, listitem);
-            return 1;
-        }
-
-        // ------------------------- admin escolhe o jogador -------------------------
-        case DLG_CLA_PLAYERS:
-        {
-            if(!response) return ClaShowConfig(playerid);
-            if(!IsPlayerAdmin(playerid))
-                return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON pode fazer isso.");
-
-            // descobre qual jogador corresponde ao item selecionado
-            new idx = 0, escolhido = INVALID_PLAYER_ID;
-            foreach(i)
-            {
-                if(idx == listitem) { escolhido = i; break; }
-                idx++;
-            }
-
-            if(escolhido == INVALID_PLAYER_ID)
-                return ClaShowPlayerList(playerid);
-
-            ClaSelPlayer[playerid] = escolhido;
-            return ClaShowSetTeam(playerid, escolhido);
-        }
-
-        // ------------------------- admin define o time -------------------------
-        case DLG_CLA_SETTEAM:
-        {
-            if(!response) return ClaShowPlayerList(playerid);
-            if(!IsPlayerAdmin(playerid))
-                return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON pode fazer isso.");
-
-            new alvo = ClaSelPlayer[playerid];
-            if(alvo == INVALID_PLAYER_ID || !IsPlayerConnected(alvo))
-            {
-                SCM(playerid, COLOR_RED, "[ERRO]: Jogador invalido.");
-                return ClaShowPlayerList(playerid);
-            }
-
-            if(listitem == 0)      ClaSetTeam(playerid, alvo, 0);
-            else if(listitem == 1) ClaSetTeam(playerid, alvo, 1);
-            else if(listitem == 2) ClaSetTeam(playerid, alvo, -1);
-
-            ClaSelPlayer[playerid] = INVALID_PLAYER_ID;
-            return ClaShowPlayerList(playerid);
-        }
+    // Dialogos do CLA (delegados para o handler no include)
+    if(dialogid >= DLG_CLA_CONFIG && dialogid <= DLG_CLA_MEMBERS)
+    {
+        if(!IsPlayerAdmin(playerid) && dialogid != DLG_CLA_MEMBERS)
+            return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON.");
+        return ClaHandleDialog(playerid, dialogid, response, listitem, inputtext);
     }
     return 0;
 }
-
 
 // =============================================================================
 // SISTEMA DE COMANDOS (sem include externo)
@@ -2810,21 +1939,12 @@ dcmd_derby(playerid, const params[])
     if(PI[playerid][P_IN_DERBY])
         return SCM(playerid, COLOR_ORANGE, "| DERBY | Voce ja esta jogando. Use /sair para sair.");
 
-    if(DI[D_PLAYERS] >= MAX_DERBY_PLAYERS)
-        return SCM(playerid, COLOR_RED, "[ERRO]: A sala esta lotada.");
-
-    return ShowModeSelect(playerid);
-}
-
-// Reabre o painel de configuracao do CLA VS CLA (somente RCON)
-dcmd_cla(playerid, const params[])
-{
-    #pragma unused params
-    if(!IsPlayerAdmin(playerid))
-        return SCM(playerid, COLOR_RED, "[ERRO]: Apenas administradores RCON podem usar este comando.");
-
-    CL[CL_ADMIN] = playerid;
-    return ClaShowConfig(playerid);
+    // Mostrar tela de escolha de modo
+    ShowPlayerDialog(playerid, DLG_MODO, DIALOG_STYLE_LIST,
+        "{FFFFFF}DERBY - Escolha o modo",
+        "MODO FUN (mapas automaticos)\nCLA VS CLA (competitivo)",
+        "Entrar", "Fechar");
+    return 1;
 }
 
 dcmd_sair(playerid, const params[])
@@ -2834,9 +1954,6 @@ dcmd_sair(playerid, const params[])
         return SCM(playerid, COLOR_ORANGE, "| DERBY | Voce nao esta no Derby!");
 
     RemovePlayerFromDerby(playerid);
-    PI[playerid][P_CLA] = -1;
-    SetPlayerColor(playerid, COLOR_WHITE);
-    SetPlayerTeam(playerid, NO_TEAM);
     SCM(playerid, COLOR_YELLOW, "| DERBY | Voce saiu. Use /derby para voltar.");
     // Spawna o jogador numa posicao neutra
     SetPlayerPos(playerid, 0.0, 0.0, 5.0);
@@ -2920,7 +2037,7 @@ dcmd_ajuda(playerid, const params[])
 {
     #pragma unused params
     SCM(playerid, COLOR_GREEN, "============ COMANDOS DO DERBY ============");
-    SCM(playerid, COLOR_WHITE, "  /derby   - Escolher modo (FUN ou CLA VS CLA)");
+    SCM(playerid, COLOR_WHITE, "  /derby   - Entrar no Derby (FUN ou CLA VS CLA)");
     SCM(playerid, COLOR_WHITE, "  /cla     - Painel do CLA VS CLA (somente RCON)");
     SCM(playerid, COLOR_WHITE, "  /sair    - Sair do Derby");
     SCM(playerid, COLOR_WHITE, "  /stats   - Ver suas estatisticas");
@@ -2997,6 +2114,14 @@ dcmd_diag(playerid, const params[])
     SCM(playerid, COLOR_GREY, ">> No console deve aparecer: MAPAS DERBY CARGADOS || MAPAS: 52");
     SCM(playerid, COLOR_GREY, ">> Se nao aparecer: falta 'plugins streamer' ou 'filterscripts SFRDERBY'.");
     return 1;
+}
+
+dcmd_cla(playerid, const params[])
+{
+    #pragma unused params
+    if(!IsPlayerAdmin(playerid))
+        return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON pode usar /cla.");
+    return ClaShowPanel(playerid);
 }
 
 dcmd_reloadmaps(playerid, const params[])
