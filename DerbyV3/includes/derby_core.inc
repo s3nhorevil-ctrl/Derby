@@ -395,9 +395,9 @@ stock GetModeName(mode, dest[])
     return 1;
 }
 
-stock GetRoomStateName(state, dest[])
+stock GetRoomStateName(roomstate, dest[])
 {
-    switch(state)
+    switch(roomstate)
     {
         case ROOM_STATE_EMPTY: strmid(dest, "Vazia", 0, 5, 20);
         case ROOM_STATE_LOBBY: strmid(dest, "Aguardando", 0, 10, 20);
