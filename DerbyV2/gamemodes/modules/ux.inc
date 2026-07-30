@@ -21,12 +21,5 @@ stock UX_ShowWelcome(playerid)
         C_DERBY "DERBY DESTRUCTION " C_WHITE "- Bem-vindo!", info, "Jogar!", "");
 }
 
-stock UX_ShowModeSelect(playerid)
-{
-    ShowPlayerDialog(playerid, DLG_MODE_SELECT, DIALOG_STYLE_LIST,
-        C_WHITE "Escolha o modo de jogo",
-        C_GOLD "MODO FUN " C_GREY "(mapas automaticos)\n" \
-        C_BLUE "CLA VS CLA " C_GREY "(competitivo - RCON)\n" \
-        C_CYAN "TREINAMENTO " C_GREY "(pratique livremente)",
-        "Entrar", "Voltar");
-}
+// UX_ShowModeSelect removido - /derby vai direto pro FUN
+// /modo mostra livre/treino via dialog em commands.inc

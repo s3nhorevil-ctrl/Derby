@@ -79,6 +79,7 @@ public OnPlayerSpawn(playerid)
     TogglePlayerControllable(playerid, false);
     SetCameraBehindPlayer(playerid);
 
+    CancelSelectTextDraw(playerid);
     UX_ShowWelcome(playerid);
     return 1;
 }
@@ -119,7 +120,8 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
         {
             TogglePlayerControllable(playerid, true);
             SetPlayerVirtualWorld(playerid, VW_LOBBY);
-            UX_ShowModeSelect(playerid);
+            // Entrar direto no FUN apos boas-vindas
+            ModeFun_Join(playerid);
             return 1;
         }
         case DLG_MODE_SELECT:
@@ -127,9 +129,8 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
             if(!response) return 1;
             switch(listitem)
             {
-                case 0: ModeFun_Join(playerid);
-                case 1: ModeCla_Join(playerid);
-                case 2: ModeTrain_Join(playerid);
+                case 0: ModeCla_Join(playerid);   // LIVRE (modo CLA sem competicao = livre)
+                case 1: ModeTrain_Join(playerid); // TREINAMENTO
             }
             return 1;
         }

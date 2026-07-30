@@ -138,6 +138,7 @@ stock Derby_Go()
 
         // Ligar motor e liberar
         TogglePlayerControllable(i, true);
+        CancelSelectTextDraw(i);
         SetVehicleParamsEx(Player[i][pVehicleID], 1, 1, 0, 1, 0, 0, 0);
         PlayerPlaySound(i, 3200, 0.0, 0.0, 0.0);
 

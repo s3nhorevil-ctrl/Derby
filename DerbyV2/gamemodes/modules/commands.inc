@@ -18,7 +18,21 @@ public OnPlayerCommandText(playerid, cmdtext[])
     // --- Comandos ---
     if(!strcmp(cmd, "/derby", true))
     {
-        UX_ShowModeSelect(playerid);
+        if(Player[playerid][pMode] != MODE_NONE)
+            return SCM(playerid, COL_ORANGE, C_ORANGE "Voce ja esta num modo. Use /sair primeiro.");
+        ModeFun_Join(playerid);
+        return 1;
+    }
+
+    if(!strcmp(cmd, "/modo", true))
+    {
+        if(Player[playerid][pMode] != MODE_NONE)
+            return SCM(playerid, COL_ORANGE, C_ORANGE "Voce ja esta num modo. Use /sair primeiro.");
+        ShowPlayerDialog(playerid, DLG_MODE_SELECT, DIALOG_STYLE_LIST,
+            C_WHITE "Escolha o modo",
+            C_GOLD "LIVRE " C_GREY "(ande pelo mapa sem eliminacao)\n" \
+            C_CYAN "TREINAMENTO " C_GREY "(cai e volta automaticamente)",
+            "Entrar", "Fechar");
         return 1;
     }
 
@@ -54,7 +68,8 @@ public OnPlayerCommandText(playerid, cmdtext[])
     if(!strcmp(cmd, "/ajuda", true) || !strcmp(cmd, "/help", true))
     {
         SCM(playerid, COL_DERBY, C_DERBY "=== COMANDOS ===");
-        SCM(playerid, COL_WHITE, "/derby - Escolher modo de jogo");
+        SCM(playerid, COL_WHITE, "/derby - Entrar no Derby (modo FUN)");
+        SCM(playerid, COL_WHITE, "/modo  - Livre ou Treinamento");
         SCM(playerid, COL_WHITE, "/sair  - Sair do modo atual");
         SCM(playerid, COL_WHITE, "/stats - Ver suas estatisticas");
         SCM(playerid, COL_WHITE, "/top   - Ranking dos melhores");
