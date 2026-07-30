@@ -534,11 +534,11 @@ CMD:sala(playerid, params[])
     format(str, sizeof(str), "  Nome: {FFFF00}%s", RoomData[roomid][ROOM_NAME]);
     SCM(playerid, COLOR_WHITE, str);
     
-    GetModeName(RoomData[roomid][ROOM_MODE], modename, sizeof(modename));
+    GetModeName(RoomData[roomid][ROOM_MODE], modename);
     format(str, sizeof(str), "  Modo: {00FF00}%s", modename);
     SCM(playerid, COLOR_WHITE, str);
     
-    GetRoomStateName(RoomData[roomid][ROOM_STATE], statename, sizeof(statename));
+    GetRoomStateName(RoomData[roomid][ROOM_STATE], statename);
     format(str, sizeof(str), "  Status: {00FF00}%s", statename);
     SCM(playerid, COLOR_WHITE, str);
     
@@ -550,7 +550,7 @@ CMD:sala(playerid, params[])
         RoomData[roomid][ROOM_CURRENT_ROUND], RoomData[roomid][ROOM_TOTAL_ROUNDS]);
     SCM(playerid, COLOR_WHITE, str);
     
-    GetVehicleNameByModel(RoomData[roomid][ROOM_VEHICLE], vehname, sizeof(vehname));
+    GetVehicleNameByModel(RoomData[roomid][ROOM_VEHICLE], vehname);
     format(str, sizeof(str), "  Veiculo: {FFFF00}%s", vehname);
     SCM(playerid, COLOR_WHITE, str);
     

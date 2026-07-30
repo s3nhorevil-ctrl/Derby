@@ -65,8 +65,8 @@ stock ShowRoomList(playerid)
         else lock[0] = '\0';
         
         new modename[20], statename[20];
-        GetModeName(RoomData[i][ROOM_MODE], modename, sizeof(modename));
-        GetRoomStateName(RoomData[i][ROOM_STATE], statename, sizeof(statename));
+        GetModeName(RoomData[i][ROOM_MODE], modename);
+        GetRoomStateName(RoomData[i][ROOM_STATE], statename);
         
         // Build line in parts to avoid format argument limit
         line[0] = '\0';
@@ -218,8 +218,8 @@ stock ShowRoomNameInput(playerid)
 stock ShowRoomConfirmation(playerid)
 {
     new str[512], vehname[24], modename[20];
-    GetVehicleNameByModel(RoomCreation[playerid][RC_VEHICLE], vehname, sizeof(vehname));
-    GetModeName(RoomCreation[playerid][RC_MODE], modename, sizeof(modename));
+    GetVehicleNameByModel(RoomCreation[playerid][RC_VEHICLE], vehname);
+    GetModeName(RoomCreation[playerid][RC_MODE], modename);
     
     format(str, sizeof(str),
         "{FFFFFF}Confirme as configuracoes da sala:\n\n"\
