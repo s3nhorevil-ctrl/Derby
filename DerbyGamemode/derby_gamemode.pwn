@@ -645,8 +645,6 @@ PlayerDerbyDead(playerid)
         DI[D_RUNNINGPLAYERS] = 0;
         SendMessageToAllDerby(COLOR_YELLOW, "| DERBY | Rodada encerrada. Carregando proximo mapa...");
         TextDrawSetString(TD_DerbyMessage, "~y~rodada encerrada");
-            DI[D_DERBYGOD_VOTES][0] = 0;
-        DI[D_DERBYGOD_VOTES][1] = 0;
         KillTimer(DI[D_TIMEOUT_TIMER]);
         KillTimer(DI[D_NEXTDSTATUS_TIMER]);
         DI[D_NEXTDSTATUS_TIMER] = SetTimer("NextDerbyStatus", 3000, false);
@@ -668,8 +666,6 @@ PlayerDerbyDead(playerid)
                 format(win_msg, sizeof(win_msg), "{00FF00}| DERBY | %s (%i) Venceu a partida!", pNome(i), i);
                 SendMessageToAllDerby(COLOR_INFO, win_msg);
 
-                            DI[D_DERBYGOD_VOTES][0] = 0;
-                DI[D_DERBYGOD_VOTES][1] = 0;
 
                 // Salvar vitoria no banco
                 if(Database != DB:0)
@@ -1005,11 +1001,8 @@ public NextDerbyStatus()
             DI[D_TICKCOUNT] = gettime();
             DI[D_STATUS] = DERBY_RUNNING;
             UpdatePlayersDerbyStatus();
-
-            if(DI[D_DERBYGOD_VOTES][0] > DI[D_DERBYGOD_VOTES][1])
-            else if(DI[D_DERBYGOD_VOTES][1] > DI[D_DERBYGOD_VOTES][0])
-                        else
         }
+
     }
     return 1;
 }
@@ -1063,8 +1056,6 @@ public DerbyTimeOutCountdown()
             }
 
             SendMessageToAllDerby(COLOR_YELLOW, "| DERBY | Partida finalizada - tempo limite excedido!");
-                    DI[D_DERBYGOD_VOTES][0] = 0;
-            DI[D_DERBYGOD_VOTES][1] = 0;
             DI[D_RUNNINGPLAYERS] = 0;
             KillTimer(DI[D_NEXTDSTATUS_TIMER]);
             DI[D_NEXTDSTATUS_TIMER] = SetTimer("NextDerbyStatus", 3000, false);
