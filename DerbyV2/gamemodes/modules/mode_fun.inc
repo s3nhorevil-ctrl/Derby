@@ -66,7 +66,7 @@ stock ModeFun_Leave(playerid)
     if(Match[mState] == DERBY_RUNNING && Match[mAlivePlayers] <= 1)
     {
         new winner = INVALID_PLAYER_ID;
-        Loop(i, pool)
+        for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
         {
             if(IsPlayerInDerby(i) && IsPlayerAlive(i))
             {
@@ -87,7 +87,7 @@ stock ModeFun_TryStart()
 {
     // Contar jogadores no modo FUN
     new count = 0;
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(IsPlayerInDerby(i)) count++;
     }
@@ -110,7 +110,7 @@ stock ModeFun_TryStart()
 stock ModeFun_NextMap()
 {
     // Resetar estados dos jogadores
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(!IsPlayerInDerby(i)) continue;
         Player[i][pMatchState] = PSTATE_ALIVE;

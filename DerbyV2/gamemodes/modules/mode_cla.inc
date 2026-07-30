@@ -40,27 +40,27 @@ forward Cla_RespawnPlayer(playerid);
 stock Cla_CountTeam(team)
 {
     new count = 0;
-    Loop(i, pool) if(IsPlayerInCla(i) && Player[i][pClaTeam] == team) count++;
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i)) if(IsPlayerInCla(i) && Player[i][pClaTeam] == team) count++;
     return count;
 }
 
 stock Cla_CountAlive(team)
 {
     new count = 0;
-    Loop(i, pool) if(IsPlayerInCla(i) && Player[i][pClaTeam] == team && IsPlayerAlive(i)) count++;
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i)) if(IsPlayerInCla(i) && Player[i][pClaTeam] == team && IsPlayerAlive(i)) count++;
     return count;
 }
 
 stock Cla_CountAll()
 {
     new count = 0;
-    Loop(i, pool) if(IsPlayerInCla(i)) count++;
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i)) if(IsPlayerInCla(i)) count++;
     return count;
 }
 
 stock Cla_Broadcast(color, const msg[])
 {
-    Loop(i, pool) if(IsPlayerInCla(i)) SCM(i, color, msg);
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i)) if(IsPlayerInCla(i)) SCM(i, color, msg);
 }
 
 // =============================================================================
@@ -170,7 +170,7 @@ stock Cla_LoadMap(mapid)
     Cla[cMapID] = mapid;
 
     // Teleportar todos
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(!IsPlayerInCla(i)) continue;
         if(GetPlayerState(i) == PLAYER_STATE_SPECTATING)
@@ -203,7 +203,7 @@ stock Cla_StartRound(adminid)
 
     // Reposicionar todos
     new slot = 0;
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(!IsPlayerInCla(i)) continue;
         if(GetPlayerState(i) == PLAYER_STATE_SPECTATING)
@@ -231,7 +231,7 @@ public Cla_CountdownTick()
 {
     Cla[cState] = CLA_RUNNING;
 
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(!IsPlayerInCla(i) || !IsPlayerAlive(i)) continue;
         TogglePlayerControllable(i, true);
@@ -252,13 +252,13 @@ stock Cla_TogglePause(adminid)
     if(Cla[cState] == CLA_RUNNING)
     {
         Cla[cState] = CLA_PAUSED;
-        Loop(i, pool) if(IsPlayerInCla(i)) TogglePlayerControllable(i, false);
+        for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i)) if(IsPlayerInCla(i)) TogglePlayerControllable(i, false);
         Cla_Broadcast(COL_YELLOW, C_YELLOW ">> Round PAUSADO.");
     }
     else if(Cla[cState] == CLA_PAUSED)
     {
         Cla[cState] = CLA_RUNNING;
-        Loop(i, pool) if(IsPlayerInCla(i) && IsPlayerAlive(i)) TogglePlayerControllable(i, true);
+        for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i)) if(IsPlayerInCla(i) && IsPlayerAlive(i)) TogglePlayerControllable(i, true);
         Cla_Broadcast(COL_GREEN, C_GREEN ">> Round RETOMADO!");
     }
     else
@@ -296,7 +296,7 @@ stock Cla_PlayerDied(playerid)
 
     // Spectate
     TogglePlayerSpectating(playerid, true);
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(i == playerid) continue;
         if(IsPlayerInCla(i) && IsPlayerAlive(i) && Player[i][pVehicleID] != INVALID_VEHICLE_ID)
@@ -379,7 +379,7 @@ stock Cla_EndRound(winner)
     }
 
     // Descongelar todos e parar spectate
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(!IsPlayerInCla(i)) continue;
         if(GetPlayerState(i) == PLAYER_STATE_SPECTATING)
@@ -420,7 +420,7 @@ stock Cla_ToggleTraining(adminid)
 stock Cla_Shutdown()
 {
     KillTimer(Cla[cTimer]);
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(!IsPlayerInCla(i)) continue;
         DestroyPlayerVehicle(i);
@@ -516,7 +516,7 @@ stock Cla_ShowMapList(playerid)
 stock Cla_ShowMembers(playerid)
 {
     new info[2000], tmp[80];
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(!IsPlayerInCla(i)) continue;
         new team_txt[16];
@@ -606,7 +606,7 @@ stock Cla_HandleDialog(playerid, dialogid, response, listitem, inputtext[])
         if(!response) return Cla_ShowPanel(playerid);
         // Encontrar o jogador clicado
         new idx = 0, target = INVALID_PLAYER_ID;
-        Loop(i, pool)
+        for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
         {
             if(!IsPlayerInCla(i)) continue;
             if(idx == listitem) { target = i; break; }

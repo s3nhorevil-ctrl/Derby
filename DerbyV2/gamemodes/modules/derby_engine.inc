@@ -53,7 +53,7 @@ stock Derby_StartMatch(mapid)
 
     // Posicionar todos os jogadores do modo FUN
     new slot = 0;
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(!IsPlayerInDerby(i)) continue;
         if(slot >= MAX_DERBY_SLOTS) break;
@@ -84,7 +84,7 @@ stock Derby_StartMatch(mapid)
     Derby_Broadcast(COL_DERBY, msg);
 
     // HUD
-    HUD_ShowMatch();
+    HUD_ShowMatch_Ex(MapInfo[mapid][mapName], Match[mAlivePlayers], Match[mPlayers]);
     return 1;
 }
 
@@ -105,7 +105,7 @@ public Derby_CountdownTick()
     // Som de contagem
     if(Match[mCountdown] > 0 && Match[mCountdown] <= 3)
     {
-        Loop(i, pool)
+        for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
         {
             if(IsPlayerInDerby(i) && IsPlayerAlive(i))
                 PlayerPlaySound(i, 1056, 0.0, 0.0, 0.0);
@@ -132,7 +132,7 @@ stock Derby_Go()
     Match[mState] = DERBY_RUNNING;
     Match[mStartTime] = gettime();
 
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(!IsPlayerInDerby(i) || !IsPlayerAlive(i)) continue;
 
@@ -180,7 +180,7 @@ public Derby_RoundTick()
     }
 
     // Detectar queda de cada jogador
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(!IsPlayerInDerby(i) || !IsPlayerAlive(i)) continue;
         if(GetPlayerState(i) != PLAYER_STATE_DRIVER) continue;
@@ -230,7 +230,7 @@ stock Derby_EliminatePlayer(playerid)
     {
         // Encontrar o vencedor
         new winner = INVALID_PLAYER_ID;
-        Loop(i, pool)
+        for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
         {
             if(IsPlayerInDerby(i) && IsPlayerAlive(i))
             {
@@ -298,7 +298,7 @@ stock Derby_SetSpectate(playerid)
     Player[playerid][pMatchState] = PSTATE_SPECTATING;
 
     // Encontrar alguem vivo para assistir
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(i == playerid) continue;
         if(!IsPlayerInDerby(i) || !IsPlayerAlive(i)) continue;
@@ -318,7 +318,7 @@ stock Derby_NextSpectate(playerid)
     new current = Player[playerid][pSpectateTarget];
     new found = INVALID_PLAYER_ID;
 
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(i == playerid || i == current) continue;
         if(!IsPlayerInDerby(i) || !IsPlayerAlive(i)) continue;
@@ -370,7 +370,7 @@ stock Derby_SpawnPlayerVehicle(playerid, mapid, slot)
 
 stock Derby_Broadcast(color, const msg[])
 {
-    Loop(i, pool)
+    for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(IsPlayerInDerby(i))
             SCM(i, color, msg);

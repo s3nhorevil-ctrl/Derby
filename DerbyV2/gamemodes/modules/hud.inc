@@ -77,19 +77,20 @@ stock HUD_Create()
 // MOSTRAR/ESCONDER HUD DA PARTIDA
 // =============================================================================
 
-stock HUD_ShowMatch()
+stock HUD_ShowMatch_Ex(const mapname[], alive, total)
 {
     new str[64];
-    format(str, sizeof(str), "~w~Mapa: ~y~%s", MapInfo[Match[mMapID]][mapName]);
+    format(str, sizeof(str), "~w~Mapa: ~y~%s", mapname);
     TextDrawSetString(TD_MapName, str);
 
-    format(str, sizeof(str), "~w~Vivos: ~g~%d/%d", Match[mAlivePlayers], Match[mPlayers]);
+    format(str, sizeof(str), "~w~Vivos: ~g~%d/%d", alive, total);
     TextDrawSetString(TD_Alive, str);
 
     TextDrawSetString(TD_Timer, FormatTime(ROUND_TIMEOUT));
 
-    Loop(i, pool)
+    for(new i = 0, j = GetPlayerPoolSize(); i <= j; i++)
     {
+        if(!IsPlayerConnected(i)) continue;
         if(IsPlayerInDerby(i))
         {
             TextDrawShowForPlayer(i, TD_Timer);
@@ -122,7 +123,7 @@ stock HUD_UpdateCountdown(seconds)
         format(str, sizeof(str), "%d", seconds);
         TextDrawSetString(TD_Countdown, str);
 
-        Loop(i, pool)
+        for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
         {
             if(IsPlayerInDerby(i))
                 TextDrawShowForPlayer(i, TD_Countdown);
@@ -131,7 +132,7 @@ stock HUD_UpdateCountdown(seconds)
     else
     {
         TextDrawSetString(TD_Countdown, "~g~GO!");
-        Loop(i, pool)
+        for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
         {
             if(IsPlayerInDerby(i))
                 TextDrawShowForPlayer(i, TD_Countdown);
@@ -166,8 +167,9 @@ stock HUD_ShowWinner(winner)
         format(str, sizeof(str), "~y~TEMPO ESGOTADO");
 
     TextDrawSetString(TD_WinnerMsg, str);
-    Loop(i, pool)
+    for(new i = 0, j = GetPlayerPoolSize(); i <= j; i++)
     {
+        if(!IsPlayerConnected(i)) continue;
         if(IsPlayerInDerby(i))
             TextDrawShowForPlayer(i, TD_WinnerMsg);
     }
