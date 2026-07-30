@@ -1,0 +1,24 @@
+echo Executando server.cfg do DERBY
+lanmode 0
+rcon_password MUDE_ESSA_SENHA
+maxplayers 50
+port 7777
+hostname Servidor Derby - Mata-Mata de Carros
+gamemode0 derby_gamemode 1
+announce 0
+query 1
+weburl www.sa-mp.com
+maxnpc 0
+onfoot_rate 40
+incar_rate 40
+weapon_rate 40
+stream_distance 300.0
+stream_rate 1000
+language Portuguese
+
+; ---------------------------------------------------------------
+; OBRIGATORIO: o plugin streamer e o filterscript dos mapas
+; Sem isso as plataformas NAO aparecem e os carros caem no vazio
+; ---------------------------------------------------------------
+plugins streamer
+filterscripts SFRDERBY

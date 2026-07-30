@@ -8,9 +8,6 @@
     Includes necessarios:
         - a_samp.inc
         - sscanf2.inc
-        - Pawn.CMD (ou zcmd)
-        - foreach.inc / YSI y_iterate
-        - OnPlayerPause (include para detectar ESC)
     
     Funcionamento:
         - Jogadores entram no Derby automaticamente ao conectar
@@ -22,14 +19,28 @@
 
 #include <a_samp>
 #include <sscanf2>
-#include <Pawn.CMD>
-#include <foreach>
-#include <OnPlayerPause>
+#include <streamer>
 
 #pragma tabsize 0
 #pragma dynamic 65536
 
 native IsValidVehicle(vehicleid);
+
+// =============================================================================
+// SISTEMA DE DETECCAO DE PAUSE (substitui OnPlayerPause)
+// =============================================================================
+new PlayerLastUpdate[MAX_PLAYERS];
+
+stock IsPlayerPaused(playerid)
+{
+    if(GetTickCount() - PlayerLastUpdate[playerid] > 2000) return 1;
+    return 0;
+}
+
+// =============================================================================
+// MACRO FOREACH (substitui include foreach)
+// =============================================================================
+#define foreach(%0) for(new %0 = 0, __j = GetPlayerPoolSize(); %0 <= __j; %0++) if(IsPlayerConnected(%0))
 
 
 // =============================================================================
@@ -46,11 +57,28 @@ native IsValidVehicle(vehicleid);
 #define MAX_DERBYS              (200)
 #define NO_WINNER               (-1)
 
-#define DERBY_VW                (50)
+#define DERBY_VW_BASE           (50)   // VW base (bate com SFRDERBY)
 #define AFK_WARNING_SECONDS     (10)
 #define AFK_KICK_SECONDS        (20)
 #define DERBY_TIMEOUT_SECONDS   (180)
 #define DERBY_COUNTDOWN_SECONDS (10)
+
+// --- Compatibilidade de estilos de dialogo (caso a_samp seja antigo) ---
+#if !defined DIALOG_STYLE_TABLIST
+    #define DIALOG_STYLE_TABLIST         (4)
+#endif
+#if !defined DIALOG_STYLE_TABLIST_HEADERS
+    #define DIALOG_STYLE_TABLIST_HEADERS (5)
+#endif
+
+// --- IDs dos dialogos ---
+#define DLG_MODO            (9100)
+#define DLG_CLA_CONFIG      (9101)
+#define DLG_CLA_MAPA        (9102)
+#define DLG_CLA_ROUNDS      (9103)
+#define DLG_CLA_VEICULO     (9104)
+#define DLG_CLA_MEMBERS     (9105)
+#define DLG_WELCOME         (9110)
 
 #define SCM SendClientMessage
 #define SCMToAll SendClientMessageToAll
@@ -86,6 +114,8 @@ enum
     PD_SPECTATE
 };
 
+
+
 enum DINFO
 {
     D_PLAYERS,
@@ -99,6 +129,7 @@ enum DINFO
     D_HOUR,
     D_VEHICLE,
     Float:D_ZPOS,
+    D_VW,               // virtual world do mapa (bate com o filterscript SFRDERBY)
 
     D_TICKCOUNT,
     D_COUNTDOWN_COUNTER,
@@ -108,8 +139,6 @@ enum DINFO
     D_TIMEOUT_TIMER,
     D_MAX_PRIZE,
     D_MAX2_PRIZE,
-    D_DERBYGOD_VOTES[2],
-    D_DERBYGODCAR
 };
 
 enum PINFO
@@ -119,7 +148,6 @@ enum PINFO
     P_DERBY_POSITION,
     P_DERBY_STATUS,
     P_DERBY_SPECTATEPLAYER,
-    bool:P_DERBY_VOTED,
     bool:P_IN_DERBY,
     P_SCORE,
     P_TIMER_PAUSE
@@ -135,16 +163,22 @@ new Float:DERBY_SPAWN[MAX_DERBY_PLAYERS][4];
 new DERBY_SLOT_USED[MAX_DERBY_PLAYERS];
 new TOTAL_DERBYS;
 new File_String[512];
-new DERBY_FILENAMES[MAX_DERBYS][24];
+new DERBY_FILENAMES[MAX_DERBYS][32];
+
+// Tabela de virtual worlds (arquivo -> VW do filterscript)
+new VW_FILE[MAX_DERBYS][32];
+new VW_ID[MAX_DERBYS];
+new VW_TOTAL;
+
+// Nome amigavel de cada mapa (lido do cabecalho do .sfr)
+new DERBY_MAPNAME[MAX_DERBYS][24];
+
+
 
 // TextDraws
 new Text:TD_DERBY[9];
 new Text:TD_DerbyMessage;
-new Text:TD_DERBY_GodCar[4];
 new Text:TD_ESPEC_DERBY;
-
-// GodCar
-new bool:DerbyAtivarGod = false;
 
 // Anti-AFK
 new Float:DerbyLastPosHash[MAX_PLAYERS];
@@ -166,8 +200,9 @@ forward NextDerbyStatus();
 forward DerbyCountdown();
 forward DerbyTimeOutCountdown();
 forward HideDerbyMessage();
-forward GodDerbyTimer();
 forward AntiAFKTimer();
+
+
 
 // =============================================================================
 // FUNCOES UTILITARIAS
@@ -204,7 +239,7 @@ stock StripNewLine(string[])
 
 stock SendMessageToAllDerby(color, const message[])
 {
-    foreach(new i : Player)
+    foreach(i)
     {
         if(PI[i][P_IN_DERBY])
         {
@@ -263,18 +298,81 @@ stock ResetAwayDerbyStatus(playerid)
 // SISTEMA DE CARREGAMENTO DE MAPAS
 // =============================================================================
 
+// =============================================================================
+// TABELA DE VIRTUAL WORLDS
+// Cada mapa tem um VW fixo que corresponde ao filterscript SFRDERBY.
+// Arquivo: DERBY/vworlds.txt   ->   formato:  nomedoarquivo.sfr,VW
+// =============================================================================
+
+LoadVirtualWorlds()
+{
+    VW_TOTAL = 0;
+    new File:Handler = fopen("DERBY/vworlds.txt", io_read);
+    if(!Handler)
+    {
+        printf("[DERBY] AVISO: DERBY/vworlds.txt nao encontrado. Usando VW = indice + %d", DERBY_VW_BASE);
+        return 0;
+    }
+    while(fread(Handler, File_String))
+    {
+        StripNewLine(File_String);
+        if(strlen(File_String) < 3) continue;
+        if(VW_TOTAL >= MAX_DERBYS) break;
+
+        new nome[32], vw;
+        if(!sscanf(File_String, "p<,>s[32]d", nome, vw))
+        {
+            format(VW_FILE[VW_TOTAL], 32, "%s", nome);
+            VW_ID[VW_TOTAL] = vw;
+            VW_TOTAL++;
+        }
+    }
+    fclose(Handler);
+    printf("[DERBY] Tabela de virtual worlds carregada: %d entradas", VW_TOTAL);
+    return 1;
+}
+
+// Retorna o VW de um caminho tipo "DERBY/rampa2.sfr"
+GetMapVirtualWorld(const path[], fallback)
+{
+    new base[32], len = strlen(path), start = 0;
+    for(new i = 0; i < len; i++)
+    {
+        if(path[i] == '/' || path[i] == '\\') start = i + 1;
+    }
+    format(base, sizeof(base), "%s", path[start]);
+
+    for(new i = 0; i < VW_TOTAL; i++)
+    {
+        if(!strcmp(VW_FILE[i], base, true)) return VW_ID[i];
+    }
+    return fallback;
+}
+
+// =============================================================================
+// CARREGAMENTO DA LISTA DE MAPAS
+// =============================================================================
+
 LoadDerbyNames(const mapname[])
 {
     new File:Handler = fopen(mapname, io_read);
-    if(!Handler) return 0;
+    if(!Handler)
+    {
+        printf("[DERBY] ERRO: nao foi possivel abrir a lista de mapas: %s", mapname);
+        return 0;
+    }
+
     TOTAL_DERBYS = 0;
     for(new i = 0; i != MAX_DERBYS; i++) DERBY_FILENAMES[i] = "";
+
     while(fread(Handler, File_String))
     {
+        StripNewLine(File_String);
+        if(strlen(File_String) < 3) continue;
+        if(File_String[0] == ';') continue;
         if(TOTAL_DERBYS < MAX_DERBYS)
         {
-            StripNewLine(File_String);
-            format(DERBY_FILENAMES[TOTAL_DERBYS], 24, "%s", File_String);
+            format(DERBY_FILENAMES[TOTAL_DERBYS], 32, "%s", File_String);
             TOTAL_DERBYS++;
         }
     }
@@ -282,27 +380,116 @@ LoadDerbyNames(const mapname[])
     return 1;
 }
 
+// Tenta varios caminhos possiveis para a lista de mapas
+LoadDerbyMapList()
+{
+    if(LoadDerbyNames("DERBY/derbys.sfr") && TOTAL_DERBYS > 0)
+    {
+        printf("[DERBY] Lista carregada de DERBY/derbys.sfr (%d mapas)", TOTAL_DERBYS);
+        return 1;
+    }
+    if(LoadDerbyNames("derbys.sfr") && TOTAL_DERBYS > 0)
+    {
+        printf("[DERBY] Lista carregada de derbys.sfr (%d mapas)", TOTAL_DERBYS);
+        return 1;
+    }
+    if(LoadDerbyNames("DERBY/derbysSSS.sfr") && TOTAL_DERBYS > 0)
+    {
+        printf("[DERBY] Lista carregada de DERBY/derbysSSS.sfr (%d mapas)", TOTAL_DERBYS);
+        return 1;
+    }
+
+    print("[DERBY] ***********************************************************");
+    print("[DERBY] ERRO CRITICO: NENHUM MAPA FOI CARREGADO!");
+    print("[DERBY] Verifique se existe: scriptfiles/DERBY/derbys.sfr");
+    print("[DERBY] O modo Derby ficara DESATIVADO ate isso ser corrigido.");
+    print("[DERBY] ***********************************************************");
+    return 0;
+}
+
+// Le o cabecalho de cada mapa para guardar o nome amigavel
+CacheMapNames()
+{
+    for(new i = 0; i < TOTAL_DERBYS; i++)
+    {
+        format(DERBY_MAPNAME[i], 24, "");
+        new File:h = fopen(DERBY_FILENAMES[i], io_read);
+        if(!h) continue;
+        if(fread(h, File_String))
+        {
+            StripNewLine(File_String);
+            new nome[24], a, b, c;
+            new Float:d;
+            if(!sscanf(File_String, "p<,>s[24]dddf", nome, a, b, c, d))
+                format(DERBY_MAPNAME[i], 24, "%s", nome);
+        }
+        fclose(h);
+    }
+    return 1;
+}
+
+// =============================================================================
+// CARREGAR UM MAPA
+// =============================================================================
+
 LoadDerby(derbyid)
 {
+    if(derbyid < 0 || derbyid >= TOTAL_DERBYS) return 0;
+    if(strlen(DERBY_FILENAMES[derbyid]) < 3) return 0;
+
     new File:Handler = fopen(DERBY_FILENAMES[derbyid], io_read);
-    if(!Handler) return 0;
-    new Count;
+    if(!Handler)
+    {
+        printf("[DERBY] ERRO: mapa nao encontrado: %s", DERBY_FILENAMES[derbyid]);
+        return 0;
+    }
+
+    new Count = 0;
+    new spawns = 0;
     while(fread(Handler, File_String))
     {
         StripNewLine(File_String);
+        if(strlen(File_String) < 3) continue;
+
         if(Count == 0)
         {
             if(sscanf(File_String, "p<,>s[24]dddf", DI[D_NAME], DI[D_HOUR], DI[D_WEATHER], DI[D_VEHICLE], DI[D_ZPOS]))
+            {
+                fclose(Handler);
+                printf("[DERBY] ERRO: cabecalho invalido em %s", DERBY_FILENAMES[derbyid]);
                 return 0;
+            }
         }
-        else
+        else if(spawns < MAX_DERBY_PLAYERS)
         {
-            if(sscanf(File_String, "p<,>ffff", DERBY_SPAWN[Count-1][0], DERBY_SPAWN[Count-1][1], DERBY_SPAWN[Count-1][2], DERBY_SPAWN[Count-1][3]))
-                return 0;
+            if(!sscanf(File_String, "p<,>ffff", DERBY_SPAWN[spawns][0], DERBY_SPAWN[spawns][1], DERBY_SPAWN[spawns][2], DERBY_SPAWN[spawns][3]))
+            {
+                spawns++;
+            }
         }
         Count++;
     }
     fclose(Handler);
+
+    if(spawns < 1)
+    {
+        printf("[DERBY] ERRO: mapa %s nao possui spawns validos", DERBY_FILENAMES[derbyid]);
+        return 0;
+    }
+
+    if(spawns < MAX_DERBY_PLAYERS)
+    {
+        for(new i = spawns; i < MAX_DERBY_PLAYERS; i++)
+        {
+            DERBY_SPAWN[i][0] = DERBY_SPAWN[i % spawns][0];
+            DERBY_SPAWN[i][1] = DERBY_SPAWN[i % spawns][1];
+            DERBY_SPAWN[i][2] = DERBY_SPAWN[i % spawns][2];
+            DERBY_SPAWN[i][3] = DERBY_SPAWN[i % spawns][3];
+        }
+    }
+
+    DI[D_VW] = GetMapVirtualWorld(DERBY_FILENAMES[derbyid], DERBY_VW_BASE + derbyid);
+
     DI[D_RUNNINGPLAYERS] = 0;
     DI[D_WINNER] = NO_WINNER;
     DI[D_TICKCOUNT] = 0;
@@ -311,7 +498,31 @@ LoadDerby(derbyid)
     KillTimer(DI[D_COUNTDOWN_TIMER]);
     KillTimer(DI[D_TIMEOUT_TIMER]);
     for(new i = 0; i != sizeof(DERBY_SLOT_USED); i++) DERBY_SLOT_USED[i] = false;
+
+    printf("[DERBY] Mapa carregado: %s | VW %d | veiculo %d | Zmin %.1f | spawns %d",
+        DI[D_NAME], DI[D_VW], DI[D_VEHICLE], DI[D_ZPOS], spawns);
     return 1;
+}
+
+// Carrega o proximo mapa valido a partir de um indice (evita loop infinito)
+LoadNextValidDerby(startid)
+{
+    if(TOTAL_DERBYS <= 0) return 0;
+    new id = startid;
+    if(id < 0 || id >= TOTAL_DERBYS) id = 0;
+
+    for(new tries = 0; tries < TOTAL_DERBYS; tries++)
+    {
+        if(LoadDerby(id))
+        {
+            DI[D_ID] = id;
+            return 1;
+        }
+        id++;
+        if(id >= TOTAL_DERBYS) id = 0;
+    }
+    print("[DERBY] ERRO: nenhum mapa da lista pode ser carregado!");
+    return 0;
 }
 
 
@@ -341,6 +552,7 @@ SpawnDerbyCarForPlayer(playerid, Float:X, Float:Y, Float:Z, Float:Angle, vehicle
     PI[playerid][P_DERBY_VEHICLEID] = CreateVehicle(vehicleid, X, Y, Z, Angle, minrand(128, 255), minrand(128, 255), 99999, false);
     SetVehicleVirtualWorld(PI[playerid][P_DERBY_VEHICLEID], GetPlayerVirtualWorld(playerid));
     PutPlayerInVehicleEx(playerid, PI[playerid][P_DERBY_VEHICLEID], 0);
+    AddVehicleComponent(PI[playerid][P_DERBY_VEHICLEID], 1010); // Nitro controlavel
     return PI[playerid][P_DERBY_VEHICLEID];
 }
 
@@ -363,10 +575,6 @@ CloseDerby()
     DI[D_MAX_PRIZE] = 0;
     DI[D_TIMEOUT_COUNTER] = 0;
     TextDrawSetString(TD_DerbyMessage, "_");
-    DI[D_DERBYGOD_VOTES][0] = 0;
-    DI[D_DERBYGOD_VOTES][1] = 0;
-    TextDrawSetString(TD_DERBY_GodCar[3], "SIM_GOD_CAR:_0~n~NAO_GOD_CAR:_0~n~_");
-    DerbyAtivarGod = false;
     return 1;
 }
 
@@ -394,7 +602,7 @@ PlayerDerbyDead(playerid)
     GivePlayerScoreEx(playerid, score_gain);
 
     // Salvar estatisticas no banco
-    if(db_is_valid_handle(Database))
+    if(Database != DB:0)
     {
         format(DB_Query, sizeof(DB_Query), "UPDATE derby_stats SET losses = losses + 1, score_total = score_total + %d, last_played = CURRENT_TIMESTAMP WHERE player_name = '%s'",
             score_gain, PI[playerid][P_NAME]);
@@ -407,20 +615,46 @@ PlayerDerbyDead(playerid)
         DI[D_RUNNINGPLAYERS], DI[D_PLAYERS], score_gain);
     GameTextForPlayer(playerid, str, 2000, 3);
 
-    // Mensagem para todos no Derby
+    // Mensagem comica para todos no Derby
     new msg[145];
-    format(msg, sizeof(msg), "{00FF00}| DERBY | %s (%i) Foi eliminado (posicao: %d/%d - Tempo: %s - Premio: +%d Score)",
-        pNome(playerid), playerid, DI[D_RUNNINGPLAYERS], DI[D_PLAYERS],
-        TimeConvert(gettime() - DI[D_TICKCOUNT]), score_gain);
-    SendMessageToAllDerby(COLOR_INFO, msg);
+    new frase[60];
+    switch(random(12))
+    {
+        case 0: frase = "foi comido pelo tubarao! hahaha";
+        case 1: frase = "CAIU! Muito ruim!";
+        case 2: frase = "foi pro fundo do mar!";
+        case 3: frase = "esqueceu que nao tem asas!";
+        case 4: frase = "tentou voar... nao deu certo!";
+        case 5: frase = "virou comida de peixe!";
+        case 6: frase = "olhou pro lado errado e CAIU!";
+        case 7: frase = "tropeou no proprio carro!";
+        case 8: frase = "achou que era passaro!";
+        case 9: frase = "foi empurrado com carinho!";
+        case 10: frase = "disse adeus ao mundo!";
+        case 11: frase = "mergulhou de cabeca!";
+    }
+    format(msg, sizeof(msg), "{FF6600}| DERBY | {FFFFFF}%s {FF6600}%s {999999}(pos: %d/%d | +%d score)",
+        pNome(playerid), frase, DI[D_RUNNINGPLAYERS], DI[D_PLAYERS], score_gain);
+    SendMessageToAllDerby(COLOR_ORANGE, msg);
 
     DI[D_RUNNINGPLAYERS] -= 1;
 
+    // Ninguem sobrou (partida solo) -> encerra e troca de mapa
+    if(DI[D_RUNNINGPLAYERS] <= 0)
+    {
+        DI[D_RUNNINGPLAYERS] = 0;
+        SendMessageToAllDerby(COLOR_YELLOW, "| DERBY | Rodada encerrada. Carregando proximo mapa...");
+        TextDrawSetString(TD_DerbyMessage, "~y~rodada encerrada");
+        KillTimer(DI[D_TIMEOUT_TIMER]);
+        KillTimer(DI[D_NEXTDSTATUS_TIMER]);
+        DI[D_NEXTDSTATUS_TIMER] = SetTimer("NextDerbyStatus", 3000, false);
+        return 1;
+    }
 
     // Verificar se sobrou apenas 1 jogador (VENCEDOR)
     if(DI[D_RUNNINGPLAYERS] == 1)
     {
-        foreach(new i : Player)
+        foreach(i)
         {
             if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL)
             {
@@ -432,12 +666,9 @@ PlayerDerbyDead(playerid)
                 format(win_msg, sizeof(win_msg), "{00FF00}| DERBY | %s (%i) Venceu a partida!", pNome(i), i);
                 SendMessageToAllDerby(COLOR_INFO, win_msg);
 
-                DerbyAtivarGod = false;
-                DI[D_DERBYGOD_VOTES][0] = 0;
-                DI[D_DERBYGOD_VOTES][1] = 0;
 
                 // Salvar vitoria no banco
-                if(db_is_valid_handle(Database))
+                if(Database != DB:0)
                 {
                     format(DB_Query, sizeof(DB_Query), "UPDATE derby_stats SET wins = wins + 1, score_total = score_total + %d, last_played = CURRENT_TIMESTAMP WHERE player_name = '%s'",
                         money, PI[i][P_NAME]);
@@ -466,18 +697,23 @@ PlayerDerbyDead(playerid)
     {
         // Jogador morreu mas ainda tem mais de 1 ativo - modo spectate
         PI[playerid][P_DERBY_STATUS] = PD_SPECTATE;
-        foreach(new i : Player)
+        new alvo = -1;
+        foreach(i)
         {
             if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL)
             {
-                PI[playerid][P_DERBY_SPECTATEPLAYER] = i;
+                alvo = i;
                 break;
             }
         }
-        TogglePlayerSpectatingEx(playerid, true);
-        PlayerSpectateVehicle(playerid, PI[PI[playerid][P_DERBY_SPECTATEPLAYER]][P_DERBY_VEHICLEID]);
-        SCM(playerid, COLOR_WHITE, "{FFFFFF}| DERBY | Pressione a tecla {FF0000}ENTER {FFFFFF}para mudar de jogador.");
-        TextDrawShowForPlayer(playerid, TD_ESPEC_DERBY);
+        if(alvo != -1 && IsValidVehicle(PI[alvo][P_DERBY_VEHICLEID]))
+        {
+            PI[playerid][P_DERBY_SPECTATEPLAYER] = alvo;
+            TogglePlayerSpectatingEx(playerid, true);
+            PlayerSpectateVehicle(playerid, PI[alvo][P_DERBY_VEHICLEID]);
+            SCM(playerid, COLOR_WHITE, "{FFFFFF}| DERBY | Pressione a tecla {FF0000}ENTER {FFFFFF}para mudar de jogador.");
+            TextDrawShowForPlayer(playerid, TD_ESPEC_DERBY);
+        }
     }
     return 1;
 }
@@ -496,7 +732,7 @@ CheckDerby()
         {
             if(DI[D_RUNNINGPLAYERS] == 1)
             {
-                foreach(new i : Player)
+                foreach(i)
                 {
                     if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL)
                     {
@@ -504,7 +740,7 @@ CheckDerby()
                         new money = DI[D_MAX_PRIZE] / DI[D_RUNNINGPLAYERS];
                         GivePlayerScoreEx(i, money);
 
-                        if(db_is_valid_handle(Database))
+                        if(Database != DB:0)
                         {
                             format(DB_Query, sizeof(DB_Query), "UPDATE derby_stats SET wins = wins + 1, score_total = score_total + %d, last_played = CURRENT_TIMESTAMP WHERE player_name = '%s'",
                                 money, PI[i][P_NAME]);
@@ -545,7 +781,7 @@ UpdatePlayersDerbyStatus()
     {
         case DERBY_WAIT:
         {
-            foreach(new players : Player)
+            foreach(players)
             {
                 if(PI[players][P_IN_DERBY])
                 {
@@ -558,7 +794,7 @@ UpdatePlayersDerbyStatus()
 
                     SetPlayerArmour(players, 0.0);
                     SetPlayerHealth(players, 100.0);
-                    SetPlayerVirtualWorld(players, DI[D_ID] + DERBY_VW);
+                    SetPlayerVirtualWorld(players, DI[D_VW]);
                     TogglePlayerControllable(players, true);
 
 
@@ -574,18 +810,12 @@ UpdatePlayersDerbyStatus()
                     SetPlayerTime(players, DI[D_HOUR], 0);
                     SetPlayerWeather(players, DI[D_WEATHER]);
                     DerbyAwaySeconds[players] = 0;
-
-                    // Mostrar TextDraws de votacao GodCar
-                    for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
-                        TextDrawShowForPlayer(players, TD_DERBY_GodCar[i]);
-                    if(!PI[players][P_DERBY_VOTED])
-                        SelectTextDraw(players, 0x999999FF);
                 }
             }
         }
         case DERBY_RUNNING:
         {
-            foreach(new players : Player)
+            foreach(players)
             {
                 if(PI[players][P_IN_DERBY])
                 {
@@ -617,13 +847,6 @@ UpdatePlayersDerbyStatus()
                     for(new i; i < sizeof(TD_DERBY); ++i)
                         TextDrawShowForPlayer(players, TD_DERBY[i]);
 
-                    // Esconder votacao GodCar
-                    for(new x; x < sizeof(TD_DERBY_GodCar); ++x)
-                        TextDrawHideForPlayer(players, TD_DERBY_GodCar[x]);
-                    CancelSelectTextDraw(players);
-
-                    // Salvar participacao no banco
-                    if(db_is_valid_handle(Database))
                     {
                         format(DB_Query, sizeof(DB_Query), "UPDATE derby_stats SET plays = plays + 1, last_played = CURRENT_TIMESTAMP WHERE player_name = '%s'",
                             PI[players][P_NAME]);
@@ -650,7 +873,7 @@ UpdatePlayerDerbyStatus(playerid)
             PI[playerid][P_DERBY_STATUS] = PD_NORMAL;
             PI[playerid][P_DERBY_POSITION] = GetFreeDerbySlot();
             DERBY_SLOT_USED[PI[playerid][P_DERBY_POSITION]] = true;
-            SetPlayerVirtualWorld(playerid, DI[D_ID] + DERBY_VW);
+            SetPlayerVirtualWorld(playerid, DI[D_VW]);
             TogglePlayerControllable(playerid, true);
             SpawnDerbyCarForPlayer(playerid,
                 DERBY_SPAWN[PI[playerid][P_DERBY_POSITION]][0],
@@ -662,18 +885,13 @@ UpdatePlayerDerbyStatus(playerid)
             SetPlayerTime(playerid, DI[D_HOUR], 0);
             SetPlayerWeather(playerid, DI[D_WEATHER]);
             DerbyAwaySeconds[playerid] = 0;
-
-            for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
-                TextDrawShowForPlayer(playerid, TD_DERBY_GodCar[i]);
-            if(!PI[playerid][P_DERBY_VOTED])
-                SelectTextDraw(playerid, 0x999999FF);
         }
         case DERBY_RUNNING:
         {
             // Entrou durante partida - modo spectate
-            SetPlayerVirtualWorld(playerid, DI[D_ID] + DERBY_VW);
+            SetPlayerVirtualWorld(playerid, DI[D_VW]);
             PI[playerid][P_DERBY_STATUS] = PD_SPECTATE;
-            foreach(new i : Player)
+            foreach(i)
             {
                 if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL)
                 {
@@ -707,10 +925,10 @@ public NextDerbyStatus()
     {
         case DERBY_CLOSED:
         {
-            if(!LoadDerby(DI[D_ID]))
+            if(!LoadNextValidDerby(DI[D_ID]))
             {
-                DI[D_ID] = 0;
-                LoadDerby(DI[D_ID]);
+                print("[DERBY] Nao foi possivel iniciar: nenhum mapa valido.");
+                return 1;
             }
 
             new str[64];
@@ -721,14 +939,11 @@ public NextDerbyStatus()
             KillTimer(DI[D_COUNTDOWN_TIMER]);
             DI[D_COUNTDOWN_TIMER] = SetTimer("DerbyCountdown", 900, true);
 
-            TextDrawSetString(TD_DERBY_GodCar[3], "SIM_GOD_CAR:_0~n~NAO_GOD_CAR:_0~n~_");
 
-            foreach(new players : Player)
+            foreach(players)
             {
                 if(PI[players][P_IN_DERBY])
                 {
-                    for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
-                        TextDrawShowForPlayer(players, TD_DERBY_GodCar[i]);
                     SelectTextDraw(players, 0x999999FF);
                 }
             }
@@ -737,11 +952,12 @@ public NextDerbyStatus()
         }
         case DERBY_RUNNING:
         {
-            DI[D_ID] += 1;
-            if(!LoadDerby(DI[D_ID]))
+            new nextid = DI[D_ID] + 1;
+            if(nextid >= TOTAL_DERBYS) nextid = 0;
+            if(!LoadNextValidDerby(nextid))
             {
-                DI[D_ID] = 0;
-                LoadDerby(DI[D_ID]);
+                print("[DERBY] Nao foi possivel trocar de mapa.");
+                return 1;
             }
 
             for(new i; i < sizeof(TD_DERBY); ++i)
@@ -754,14 +970,11 @@ public NextDerbyStatus()
             KillTimer(DI[D_COUNTDOWN_TIMER]);
             DI[D_COUNTDOWN_TIMER] = SetTimer("DerbyCountdown", 900, true);
 
-            TextDrawSetString(TD_DERBY_GodCar[3], "SIM_GOD_CAR:_0~n~NAO_GOD_CAR:_0~n~_");
 
-            foreach(new players : Player)
+            foreach(players)
             {
                 if(PI[players][P_IN_DERBY])
                 {
-                    for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
-                        TextDrawShowForPlayer(players, TD_DERBY_GodCar[i]);
                     SelectTextDraw(players, 0x999999FF);
                 }
             }
@@ -774,9 +987,8 @@ public NextDerbyStatus()
             TextDrawSetString(TD_DerbyMessage, "~g~go! ~r~go! ~w~go!");
             SetTimer("HideDerbyMessage", 2000, false);
 
-            foreach(new i : Player)
+            foreach(i)
             {
-                PI[i][P_DERBY_VOTED] = false;
             }
 
             DI[D_COUNTDOWN_COUNTER] = DERBY_COUNTDOWN_SECONDS + 1;
@@ -789,15 +1001,8 @@ public NextDerbyStatus()
             DI[D_TICKCOUNT] = gettime();
             DI[D_STATUS] = DERBY_RUNNING;
             UpdatePlayersDerbyStatus();
-
-            // Definir GodCar pela votacao
-            if(DI[D_DERBYGOD_VOTES][0] > DI[D_DERBYGOD_VOTES][1])
-                DerbyAtivarGod = true;
-            else if(DI[D_DERBYGOD_VOTES][1] > DI[D_DERBYGOD_VOTES][0])
-                DerbyAtivarGod = false;
-            else
-                DerbyAtivarGod = bool:random(2);
         }
+
     }
     return 1;
 }
@@ -818,7 +1023,7 @@ public DerbyTimeOutCountdown()
     DI[D_TIMEOUT_COUNTER]--;
 
     // Detector de ESC/Pause
-    foreach(new p : Player)
+    foreach(p)
     {
         if(PI[p][P_IN_DERBY] && DI[D_PLAYERS] > 1 && PI[p][P_DERBY_STATUS] == PD_NORMAL)
         {
@@ -827,7 +1032,7 @@ public DerbyTimeOutCountdown()
                 new remov[128];
                 SCM(p, COLOR_INFO, "| MODO | {FFFFFF}Voce foi removido do derby por entrar em ESC.");
                 RemovePlayerFromDerby(p);
-                JoinPlayerDerby(p); // Re-entra como spectate na proxima
+                JoinPlayerDerby(p);
                 format(remov, sizeof(remov), "| DERBY | %s (%i) Foi removido por ficar em ESC.", PI[p][P_NAME], p);
                 SendMessageToAllDerby(COLOR_GREEN, remov);
             }
@@ -841,7 +1046,7 @@ public DerbyTimeOutCountdown()
 
         if(DI[D_WINNER] == NO_WINNER)
         {
-            foreach(new playerid : Player)
+            foreach(playerid)
             {
                 if(PI[playerid][P_IN_DERBY] && PI[playerid][P_DERBY_STATUS] == PD_NORMAL)
                 {
@@ -851,9 +1056,6 @@ public DerbyTimeOutCountdown()
             }
 
             SendMessageToAllDerby(COLOR_YELLOW, "| DERBY | Partida finalizada - tempo limite excedido!");
-            DerbyAtivarGod = false;
-            DI[D_DERBYGOD_VOTES][0] = 0;
-            DI[D_DERBYGOD_VOTES][1] = 0;
             DI[D_RUNNINGPLAYERS] = 0;
             KillTimer(DI[D_NEXTDSTATUS_TIMER]);
             DI[D_NEXTDSTATUS_TIMER] = SetTimer("NextDerbyStatus", 3000, false);
@@ -897,7 +1099,7 @@ public DerbyCountdown()
         return 1;
     }
 
-    if(DI[D_PLAYERS] <= 1)
+    if(DI[D_PLAYERS] <= 0)
     {
         DI[D_COUNTDOWN_COUNTER] = DERBY_COUNTDOWN_SECONDS + 1;
         new str[64];
@@ -921,16 +1123,8 @@ public DerbyCountdown()
             CloseDerby();
             return 1;
         }
-        else if(DI[D_PLAYERS] == 1)
-        {
-            format(str, 64, "~w~mapa: %s~n~~y~esperando_jogadores", DI[D_NAME]);
-            TextDrawSetString(TD_DerbyMessage, str);
-            TextDrawHideForAll(TD_ESPEC_DERBY);
-            DI[D_COUNTDOWN_COUNTER] = DERBY_COUNTDOWN_SECONDS + 1;
-            KillTimer(DI[D_COUNTDOWN_TIMER]);
-            DI[D_COUNTDOWN_TIMER] = SetTimer("DerbyCountdown", 900, true);
-        }
-        else NextDerbyStatus();
+        // Inicia a partida mesmo com 1 jogador
+        NextDerbyStatus();
     }
     return 1;
 }
@@ -940,23 +1134,7 @@ public DerbyCountdown()
 // GOD CAR TIMER - Reparo automatico quando ativado
 // =============================================================================
 
-public GodDerbyTimer()
-{
-    if(DerbyAtivarGod == true && DI[D_STATUS] == DERBY_RUNNING)
-    {
-        foreach(new i : Player)
-        {
-            if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL)
-            {
-                if(GetPlayerState(i) == PLAYER_STATE_DRIVER)
-                {
-                    RepairVehicle(GetPlayerVehicleID(i));
-                }
-            }
-        }
-    }
-    return 1;
-}
+
 
 // =============================================================================
 // ANTI-AFK TIMER - Detector de jogadores parados
@@ -966,7 +1144,7 @@ public AntiAFKTimer()
 {
     if(DI[D_STATUS] != DERBY_RUNNING || DI[D_PLAYERS] <= 1) return 1;
 
-    foreach(new i : Player)
+    foreach(i)
     {
         if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL)
         {
@@ -1001,6 +1179,13 @@ JoinPlayerDerby(playerid)
 {
     if(PI[playerid][P_IN_DERBY]) return 1; // ja esta no derby
 
+    // Sem mapas carregados nao da para entrar (evitaria spawn em 0,0,0 = mar)
+    if(TOTAL_DERBYS <= 0)
+    {
+        SCM(playerid, COLOR_RED, "[ERRO]: Nenhum mapa de Derby carregado. Avise um administrador.");
+        return 0;
+    }
+
     if(DI[D_PLAYERS] >= MAX_DERBY_PLAYERS)
     {
         SCM(playerid, COLOR_RED, "[ERRO]: O Derby esta lotado. Aguarde a proxima partida.");
@@ -1010,7 +1195,6 @@ JoinPlayerDerby(playerid)
     DI[D_PLAYERS] += 1;
     PI[playerid][P_IN_DERBY] = true;
     PI[playerid][P_DERBY_VEHICLEID] = INVALID_VEHICLE_ID;
-    PI[playerid][P_DERBY_VOTED] = false;
 
     SetPlayerArmour(playerid, 0.0);
     SetPlayerHealth(playerid, 100.0);
@@ -1051,8 +1235,6 @@ RemovePlayerFromDerby(playerid)
         TextDrawHideForPlayer(playerid, TD_DERBY[ii]);
     TextDrawHideForPlayer(playerid, TD_DerbyMessage);
     TextDrawHideForPlayer(playerid, TD_ESPEC_DERBY);
-    for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
-        TextDrawHideForPlayer(playerid, TD_DERBY_GodCar[i]);
     CancelSelectTextDraw(playerid);
 
     // Liberar slot
@@ -1163,61 +1345,7 @@ CreateDerbyTextDraws()
     TextDrawFont(TD_DerbyMessage, 3);
     TextDrawSetProportional(TD_DerbyMessage, 1);
 
-    // Box do GodCar
-    TD_DERBY_GodCar[2] = TextDrawCreate(525.000000, 355.000000, "box");
-    TextDrawLetterSize(TD_DERBY_GodCar[2], 0.000000, 6.566666);
-    TextDrawTextSize(TD_DERBY_GodCar[2], 613.000000, 0.000000);
-    TextDrawAlignment(TD_DERBY_GodCar[2], 1);
-    TextDrawColor(TD_DERBY_GodCar[2], -1);
-    TextDrawUseBox(TD_DERBY_GodCar[2], 1);
-    TextDrawBoxColor(TD_DERBY_GodCar[2], 90);
-    TextDrawSetShadow(TD_DERBY_GodCar[2], 0);
-    TextDrawSetOutline(TD_DERBY_GodCar[2], 0);
-    TextDrawBackgroundColor(TD_DERBY_GodCar[2], 255);
-    TextDrawFont(TD_DERBY_GodCar[2], 1);
-    TextDrawSetProportional(TD_DERBY_GodCar[2], 1);
 
-
-    // Botao SIM (GodCar)
-    TD_DERBY_GodCar[0] = TextDrawCreate(545.000000, 391.000000, "~g~~h~~h~SIM");
-    TextDrawLetterSize(TD_DERBY_GodCar[0], 0.400000, 1.600000);
-    TextDrawTextSize(TD_DERBY_GodCar[0], 15.000000, 25.000000);
-    TextDrawAlignment(TD_DERBY_GodCar[0], 2);
-    TextDrawColor(TD_DERBY_GodCar[0], -1);
-    TextDrawUseBox(TD_DERBY_GodCar[0], 1);
-    TextDrawBoxColor(TD_DERBY_GodCar[0], -1600085852);
-    TextDrawSetShadow(TD_DERBY_GodCar[0], 0);
-    TextDrawSetOutline(TD_DERBY_GodCar[0], 1);
-    TextDrawBackgroundColor(TD_DERBY_GodCar[0], 255);
-    TextDrawFont(TD_DERBY_GodCar[0], 1);
-    TextDrawSetProportional(TD_DERBY_GodCar[0], 1);
-    TextDrawSetSelectable(TD_DERBY_GodCar[0], true);
-
-    // Botao NAO (GodCar)
-    TD_DERBY_GodCar[1] = TextDrawCreate(591.000000, 391.000000, "~r~NAO");
-    TextDrawLetterSize(TD_DERBY_GodCar[1], 0.400000, 1.600000);
-    TextDrawTextSize(TD_DERBY_GodCar[1], 15.000000, 30.000000);
-    TextDrawAlignment(TD_DERBY_GodCar[1], 2);
-    TextDrawColor(TD_DERBY_GodCar[1], -1);
-    TextDrawUseBox(TD_DERBY_GodCar[1], 1);
-    TextDrawBoxColor(TD_DERBY_GodCar[1], -1600085852);
-    TextDrawSetShadow(TD_DERBY_GodCar[1], 0);
-    TextDrawSetOutline(TD_DERBY_GodCar[1], 1);
-    TextDrawBackgroundColor(TD_DERBY_GodCar[1], 255);
-    TextDrawFont(TD_DERBY_GodCar[1], 1);
-    TextDrawSetProportional(TD_DERBY_GodCar[1], 1);
-    TextDrawSetSelectable(TD_DERBY_GodCar[1], true);
-
-    // Texto de contagem dos votos
-    TD_DERBY_GodCar[3] = TextDrawCreate(600.000000, 359.000000, "SIM_GOD_CAR:_0~n~NAO_GOD_CAR:_0~n~_");
-    TextDrawLetterSize(TD_DERBY_GodCar[3], 0.266333, 1.197629);
-    TextDrawAlignment(TD_DERBY_GodCar[3], 3);
-    TextDrawColor(TD_DERBY_GodCar[3], -65281);
-    TextDrawSetShadow(TD_DERBY_GodCar[3], 0);
-    TextDrawSetOutline(TD_DERBY_GodCar[3], 1);
-    TextDrawBackgroundColor(TD_DERBY_GodCar[3], 255);
-    TextDrawFont(TD_DERBY_GodCar[3], 1);
-    TextDrawSetProportional(TD_DERBY_GodCar[3], 1);
 
     // Texto de spectate
     TD_ESPEC_DERBY = TextDrawCreate(639.299972, 420.000000, "~W~PRESSIONE ~G~ENTER ~W~PARA VER OUTROS JOGADORES");
@@ -1239,7 +1367,7 @@ CreateDerbyTextDraws()
 InitDatabase()
 {
     Database = db_open("derby.db");
-    if(!db_is_valid_handle(Database))
+    if(Database == DB:0)
     {
         printf("[DERBY] ERRO: Nao foi possivel abrir o banco de dados!");
         return 0;
@@ -1260,7 +1388,7 @@ InitDatabase()
 
 RegisterPlayerStats(playerid)
 {
-    if(!db_is_valid_handle(Database)) return 0;
+    if(Database == DB:0) return 0;
     format(DB_Query, sizeof(DB_Query), "INSERT OR IGNORE INTO derby_stats (player_name) VALUES ('%s')", PI[playerid][P_NAME]);
     db_query(Database, DB_Query);
     return 1;
@@ -1270,6 +1398,9 @@ RegisterPlayerStats(playerid)
 // =============================================================================
 // CALLBACKS DO SA-MP
 // =============================================================================
+
+#include "derby_objects.inc"
+#include "derby_cla.inc"
 
 main()
 {
@@ -1283,6 +1414,14 @@ public OnGameModeInit()
     SetGameModeText(GAMEMODETEXT);
     SendRconCommand("hostname "HOSTNAME);
 
+    // Classes de jogador (skins)
+    AddPlayerClass(0, 1958.3783, 1343.1572, 15.3746, 270.0, 0, 0, 0, 0, 0, 0);
+    AddPlayerClass(1, 1958.3783, 1343.1572, 15.3746, 270.0, 0, 0, 0, 0, 0, 0);
+    AddPlayerClass(2, 1958.3783, 1343.1572, 15.3746, 270.0, 0, 0, 0, 0, 0, 0);
+    AddPlayerClass(29, 1958.3783, 1343.1572, 15.3746, 270.0, 0, 0, 0, 0, 0, 0);
+    AddPlayerClass(47, 1958.3783, 1343.1572, 15.3746, 270.0, 0, 0, 0, 0, 0, 0);
+    AddPlayerClass(60, 1958.3783, 1343.1572, 15.3746, 270.0, 0, 0, 0, 0, 0, 0);
+
     // Desabilitar interior entrances e stunt bonuses
     DisableInteriorEnterExits();
     EnableStuntBonusForAll(0);
@@ -1295,14 +1434,16 @@ public OnGameModeInit()
     CreateDerbyTextDraws();
 
     // Carregar mapas
-    LoadDerbyNames("DERBY/derbys.sfr");
-    printf("[DERBY] Total de mapas carregados: %d", TOTAL_DERBYS);
+    LoadAllDerbyObjects();
+    LoadVirtualWorlds();
+    LoadDerbyMapList();
+    CacheMapNames();
+    ClaReset();
 
     // Inicializar banco de dados
     InitDatabase();
 
     // Timers globais
-    SetTimer("GodDerbyTimer", 997, true);
     SetTimer("AntiAFKTimer", 1000, true);
 
     // Iniciar o Derby
@@ -1315,7 +1456,7 @@ public OnGameModeInit()
 
 public OnGameModeExit()
 {
-    if(db_is_valid_handle(Database))
+    if(Database != DB:0)
         db_close(Database);
     return 1;
 }
@@ -1330,7 +1471,6 @@ public OnPlayerConnect(playerid)
     PI[playerid][P_DERBY_POSITION] = 0;
     PI[playerid][P_DERBY_STATUS] = PD_NORMAL;
     PI[playerid][P_DERBY_SPECTATEPLAYER] = 0;
-    PI[playerid][P_DERBY_VOTED] = false;
     PI[playerid][P_SCORE] = 0;
     DerbyAwaySeconds[playerid] = 0;
     DerbyLastPosHash[playerid] = 0.0;
@@ -1351,8 +1491,16 @@ public OnPlayerConnect(playerid)
 public OnPlayerDisconnect(playerid, reason)
 {
     if(PI[playerid][P_IN_DERBY])
-    {
         RemovePlayerFromDerby(playerid);
+
+    // Sair do CLA se estava inscrito
+    if(CLA_INSCRITO[playerid])
+    {
+        if(CLA_VEHICLEID[playerid] != INVALID_VEHICLE_ID && IsValidVehicle(CLA_VEHICLEID[playerid]))
+            DestroyVehicle(CLA_VEHICLEID[playerid]);
+        CLA_INSCRITO[playerid] = false;
+        CLA_TEAM[playerid] = -1;
+        CLA_VEHICLEID[playerid] = INVALID_VEHICLE_ID;
     }
     return 1;
 }
@@ -1360,20 +1508,41 @@ public OnPlayerDisconnect(playerid, reason)
 
 public OnPlayerSpawn(playerid)
 {
-    // Se nao esta no derby, entrar automaticamente
-    if(!PI[playerid][P_IN_DERBY])
-    {
-        JoinPlayerDerby(playerid);
-    }
+    // Se ja esta no derby ou CLA, nao fazer nada
+    if(PI[playerid][P_IN_DERBY] || CLA_INSCRITO[playerid])
+        return 1;
+
+    // Mostrar tela de boas-vindas/changelog automaticamente
+    SetPlayerPos(playerid, 0.0, 0.0, 20.0);
+    SetPlayerVirtualWorld(playerid, playerid + 500); // mundo isolado
+    SetCameraBehindPlayer(playerid);
+    TogglePlayerControllable(playerid, false);
+
+    new info[800];
+    strcat(info, "{FFFFFF}Bem-vindo ao {FF0000}SERVIDOR DERBY!{FFFFFF}\n\n");
+    strcat(info, "{00FF00}Como funciona:{FFFFFF}\n");
+    strcat(info, "- Voce escolhe entre {FFFF00}MODO FUN{FFFFFF} (mapas automaticos)\n");
+    strcat(info, "  ou {0066FF}CLA VS CLA{FFFFFF} (competitivo)\n\n");
+    strcat(info, "{00FF00}MODO FUN:{FFFFFF}\n");
+    strcat(info, "- Mapas trocam automaticamente\n");
+    strcat(info, "- Ultimo a sobreviver na plataforma vence\n");
+    strcat(info, "- Quem cai e eliminado e assiste\n\n");
+    strcat(info, "{00FF00}CLA VS CLA:{FFFFFF}\n");
+    strcat(info, "- Configurado pelo administrador (RCON)\n");
+    strcat(info, "- Admin define: mapa, veiculo, times e rounds\n");
+    strcat(info, "- Voce pode treinar livremente ate o round comecar\n\n");
+    strcat(info, "{999999}Comandos: /derby /sair /stats /top /ajuda\n");
+    strcat(info, "{999999}CLA VS CLA e configurado apenas pelo RCON.\n");
+
+    ShowPlayerDialog(playerid, DLG_WELCOME, DIALOG_STYLE_MSGBOX,
+        "{FFFFFF}DERBY - Bem-vindo!", info, "Jogar", "");
     return 1;
 }
 
 public OnPlayerRequestClass(playerid, classid)
 {
-    // Spawn direto sem selecao de skin
-    SetPlayerPos(playerid, 0.0, 0.0, 5.0);
-    SetPlayerCameraPos(playerid, 0.0, 0.0, 50.0);
-    SetPlayerCameraLookAt(playerid, 0.0, 0.0, 5.0);
+    // Pula selecao de skin - spawn direto
+    SpawnPlayer(playerid);
     return 1;
 }
 
@@ -1382,7 +1551,7 @@ public OnPlayerDeath(playerid, killerid, reason)
     // Se morreu no derby (improvavel, mas caso de seguranca)
     if(PI[playerid][P_IN_DERBY] && PI[playerid][P_DERBY_STATUS] == PD_NORMAL)
     {
-        if(DI[D_STATUS] == DERBY_RUNNING && DI[D_RUNNINGPLAYERS] > 1)
+        if(DI[D_STATUS] == DERBY_RUNNING && DI[D_RUNNINGPLAYERS] >= 1)
         {
             PlayerDerbyDead(playerid);
         }
@@ -1398,7 +1567,7 @@ public OnPlayerStateChange(playerid, newstate, oldstate)
     {
         if(oldstate == PLAYER_STATE_DRIVER && newstate == PLAYER_STATE_ONFOOT)
         {
-            if(DI[D_STATUS] == DERBY_RUNNING && DI[D_RUNNINGPLAYERS] > 1)
+            if(DI[D_STATUS] == DERBY_RUNNING && DI[D_RUNNINGPLAYERS] >= 1)
             {
                 PlayerDerbyDead(playerid);
             }
@@ -1428,12 +1597,15 @@ public OnVehicleDamageStatusUpdate(vehicleid, playerid)
 
 public OnPlayerUpdate(playerid)
 {
+    // Atualizar timestamp para deteccao de pause
+    PlayerLastUpdate[playerid] = GetTickCount();
+
     // Verificacao continua de queda durante o derby
     if(PI[playerid][P_IN_DERBY] && PI[playerid][P_DERBY_STATUS] == PD_NORMAL)
     {
         if(GetPlayerState(playerid) == PLAYER_STATE_DRIVER)
         {
-            if(DI[D_STATUS] == DERBY_RUNNING && DI[D_RUNNINGPLAYERS] > 1)
+            if(DI[D_STATUS] == DERBY_RUNNING && DI[D_RUNNINGPLAYERS] >= 1)
             {
                 new Float:p[3];
                 GetVehiclePos(PI[playerid][P_DERBY_VEHICLEID], p[0], p[1], p[2]);
@@ -1466,24 +1638,27 @@ public OnPlayerUpdate(playerid)
             }
         }
     }
+    // Verificar queda no CLA VS CLA
+    if(CLA_INSCRITO[playerid] && CLA[CLA_RODANDO] && !CLA[CLA_PAUSADO])
+    {
+        if(GetPlayerState(playerid) == PLAYER_STATE_DRIVER && CLA_VEHICLEID[playerid] != INVALID_VEHICLE_ID)
+        {
+            new Float:cx, Float:cy, Float:cz;
+            GetVehiclePos(CLA_VEHICLEID[playerid], cx, cy, cz);
+            if(cz <= DI[D_ZPOS])
+            {
+                ClaPlayerDied(playerid);
+            }
+        }
+    }
+
     return 1;
 }
 
 
 public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
 {
-    // NOS (turbo) quando GodCar esta ativado
-    if(PI[playerid][P_IN_DERBY] && PI[playerid][P_DERBY_STATUS] == PD_NORMAL)
-    {
-        if((newkeys & KEY_FIRE) && !(oldkeys & KEY_FIRE))
-        {
-            if(GetPlayerState(playerid) == PLAYER_STATE_DRIVER && DerbyAtivarGod == true)
-            {
-                AddVehicleComponent(GetPlayerVehicleID(playerid), 1009);
-                return 1;
-            }
-        }
-    }
+
 
     // Trocar de spectate (tecla ENTER/SPRINT)
     if(PI[playerid][P_IN_DERBY] && PI[playerid][P_DERBY_STATUS] == PD_SPECTATE)
@@ -1494,7 +1669,7 @@ public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
             new found = -1;
             new current = PI[playerid][P_DERBY_SPECTATEPLAYER];
 
-            foreach(new i : Player)
+            foreach(i)
             {
                 if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL && i != current)
                 {
@@ -1517,83 +1692,145 @@ public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
 }
 
 
-public OnPlayerClickTextDraw(playerid, Text:clickedid)
+
+
+
+// =============================================================================
+// DIALOGOS
+// =============================================================================
+
+public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 {
-    // Votacao GodCar - Botao SIM
-    if(clickedid == TD_DERBY_GodCar[0])
+    // Tela de boas-vindas -> abre selecao de modo
+    if(dialogid == DLG_WELCOME)
     {
-        if(PI[playerid][P_IN_DERBY] && DI[D_STATUS] == DERBY_WAIT)
-        {
-            if(PI[playerid][P_DERBY_VOTED])
-                return SCM(playerid, COLOR_RED, "[ERRO]: Voce ja votou.");
-
-            DI[D_DERBYGOD_VOTES][0]++;
-            new str[50];
-            format(str, sizeof str, "SIM_GOD_CAR:_%d~n~NAO_GOD_CAR:_%d~n~_",
-                DI[D_DERBYGOD_VOTES][0], DI[D_DERBYGOD_VOTES][1]);
-            TextDrawSetString(TD_DERBY_GodCar[3], str);
-            CancelSelectTextDraw(playerid);
-            PI[playerid][P_DERBY_VOTED] = true;
-            SCM(playerid, COLOR_GREEN, "| DERBY | Voce votou SIM para God Car!");
-            return 1;
-        }
+        TogglePlayerControllable(playerid, true);
+        SetPlayerVirtualWorld(playerid, 0);
+        // Mostrar painel de escolha de modo automaticamente
+        ShowPlayerDialog(playerid, DLG_MODO, DIALOG_STYLE_LIST,
+            "{FFFFFF}DERBY - Escolha o modo",
+            "MODO FUN (mapas automaticos)\nCLA VS CLA (competitivo)",
+            "Entrar", "");
+        return 1;
     }
 
-    // Votacao GodCar - Botao NAO
-    if(clickedid == TD_DERBY_GodCar[1])
+    // Tela de escolha de modo
+    if(dialogid == DLG_MODO)
     {
-        if(PI[playerid][P_IN_DERBY] && DI[D_STATUS] == DERBY_WAIT)
+        if(!response) return 1;
+        if(listitem == 0) // MODO FUN
         {
-            if(PI[playerid][P_DERBY_VOTED])
-                return SCM(playerid, COLOR_RED, "[ERRO]: Voce ja votou.");
-
-            DI[D_DERBYGOD_VOTES][1]++;
-            new str[50];
-            format(str, sizeof str, "SIM_GOD_CAR:_%d~n~NAO_GOD_CAR:_%d~n~_",
-                DI[D_DERBYGOD_VOTES][0], DI[D_DERBYGOD_VOTES][1]);
-            TextDrawSetString(TD_DERBY_GodCar[3], str);
-            CancelSelectTextDraw(playerid);
-            PI[playerid][P_DERBY_VOTED] = true;
-            SCM(playerid, COLOR_GREEN, "| DERBY | Voce votou NAO para God Car!");
+            if(PI[playerid][P_IN_DERBY])
+                return SCM(playerid, COLOR_ORANGE, "| DERBY | Voce ja esta no modo FUN!");
+            JoinPlayerDerby(playerid);
             return 1;
         }
+        if(listitem == 1) // CLA VS CLA
+        {
+            ClaEntrar(playerid);
+            return 1;
+        }
+        return 1;
     }
+
+    // Dialogos do CLA (delegados para o handler no include)
+    if(dialogid >= DLG_CLA_CONFIG && dialogid <= DLG_CLA_MEMBERS)
+    {
+        if(!IsPlayerAdmin(playerid) && dialogid != DLG_CLA_MEMBERS)
+            return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON.");
+        return ClaHandleDialog(playerid, dialogid, response, listitem, inputtext);
+    }
+    return 0;
+}
+
+// =============================================================================
+// SISTEMA DE COMANDOS (sem include externo)
+// =============================================================================
+
+public OnPlayerCommandText(playerid, cmdtext[])
+{
+    new cmd[32], params[128], idx;
+    cmd = strtok(cmdtext, idx);
+    format(params, sizeof(params), "%s", cmdtext[idx]);
+
+    // Remover espaco inicial dos params
+    if(strlen(params) > 0 && params[0] == ' ')
+    {
+        strdel(params, 0, 1);
+    }
+
+    if(!strcmp(cmd, "/derby", true)) return dcmd_derby(playerid, params);
+    if(!strcmp(cmd, "/cla", true)) return dcmd_cla(playerid, params);
+    if(!strcmp(cmd, "/sair", true)) return dcmd_sair(playerid, params);
+    if(!strcmp(cmd, "/stats", true)) return dcmd_stats(playerid, params);
+    if(!strcmp(cmd, "/top", true)) return dcmd_top(playerid, params);
+    if(!strcmp(cmd, "/ajuda", true)) return dcmd_ajuda(playerid, params);
+    if(!strcmp(cmd, "/help", true)) return dcmd_help(playerid, params);
+    if(!strcmp(cmd, "/diag", true)) return dcmd_diag(playerid, params);
+    if(!strcmp(cmd, "/reloadmaps", true)) return dcmd_reloadmaps(playerid, params);
+    if(!strcmp(cmd, "/skimap", true)) return dcmd_skimap(playerid, params);
+    if(!strcmp(cmd, "/setmap", true)) return dcmd_setmap(playerid, params);
+
+    SCM(playerid, COLOR_RED, "[ERRO]: Comando desconhecido. Use /ajuda.");
     return 1;
 }
 
+stock strtok(const string[], &index)
+{
+    new length = strlen(string);
+    new result[32];
+    new pos = 0;
+
+    // Pular espacos iniciais
+    while(index < length && string[index] == ' ') index++;
+
+    // Extrair token
+    while(index < length && string[index] != ' ' && pos < 31)
+    {
+        result[pos] = string[index];
+        pos++;
+        index++;
+    }
+    result[pos] = '\0';
+    return result;
+}
 
 // =============================================================================
 // COMANDOS
 // =============================================================================
 
-CMD:derby(playerid, params[])
+dcmd_derby(playerid, const params[])
 {
+    #pragma unused params
     if(PI[playerid][P_IN_DERBY])
-        return SCM(playerid, COLOR_ORANGE, "| DERBY | Voce ja esta no Derby!");
+        return SCM(playerid, COLOR_ORANGE, "| DERBY | Voce ja esta jogando. Use /sair para sair.");
 
-    if(DI[D_PLAYERS] >= MAX_DERBY_PLAYERS)
-        return SCM(playerid, COLOR_RED, "[ERRO]: O Derby esta lotado.");
-
-    JoinPlayerDerby(playerid);
+    // Mostrar tela de escolha de modo
+    ShowPlayerDialog(playerid, DLG_MODO, DIALOG_STYLE_LIST,
+        "{FFFFFF}DERBY - Escolha o modo",
+        "MODO FUN (mapas automaticos)\nCLA VS CLA (competitivo)",
+        "Entrar", "Fechar");
     return 1;
 }
 
-CMD:sair(playerid, params[])
+dcmd_sair(playerid, const params[])
 {
+    #pragma unused params
     if(!PI[playerid][P_IN_DERBY])
         return SCM(playerid, COLOR_ORANGE, "| DERBY | Voce nao esta no Derby!");
 
     RemovePlayerFromDerby(playerid);
-    SCM(playerid, COLOR_YELLOW, "| DERBY | Voce saiu do Derby. Use /derby para voltar.");
+    SCM(playerid, COLOR_YELLOW, "| DERBY | Voce saiu. Use /derby para voltar.");
     // Spawna o jogador numa posicao neutra
     SetPlayerPos(playerid, 0.0, 0.0, 5.0);
     SetPlayerVirtualWorld(playerid, 0);
     return 1;
 }
 
-CMD:stats(playerid, params[])
+dcmd_stats(playerid, const params[])
 {
-    if(!db_is_valid_handle(Database))
+    #pragma unused params
+    if(Database == DB:0)
         return SCM(playerid, COLOR_RED, "[ERRO]: Banco de dados indisponivel.");
 
     format(DB_Query, sizeof(DB_Query), "SELECT wins, losses, plays, score_total FROM derby_stats WHERE player_name = '%s'",
@@ -1625,9 +1862,10 @@ CMD:stats(playerid, params[])
 }
 
 
-CMD:top(playerid, params[])
+dcmd_top(playerid, const params[])
 {
-    if(!db_is_valid_handle(Database))
+    #pragma unused params
+    if(Database == DB:0)
         return SCM(playerid, COLOR_RED, "[ERRO]: Banco de dados indisponivel.");
 
     format(DB_Query, sizeof(DB_Query), "SELECT player_name, wins, score_total FROM derby_stats ORDER BY wins DESC LIMIT 10");
@@ -1661,10 +1899,12 @@ CMD:top(playerid, params[])
     return 1;
 }
 
-CMD:ajuda(playerid, params[])
+dcmd_ajuda(playerid, const params[])
 {
+    #pragma unused params
     SCM(playerid, COLOR_GREEN, "============ COMANDOS DO DERBY ============");
-    SCM(playerid, COLOR_WHITE, "  /derby   - Entrar no Derby");
+    SCM(playerid, COLOR_WHITE, "  /derby   - Entrar no Derby (FUN ou CLA VS CLA)");
+    SCM(playerid, COLOR_WHITE, "  /cla     - Painel do CLA VS CLA (somente RCON)");
     SCM(playerid, COLOR_WHITE, "  /sair    - Sair do Derby");
     SCM(playerid, COLOR_WHITE, "  /stats   - Ver suas estatisticas");
     SCM(playerid, COLOR_WHITE, "  /top     - Ver ranking dos melhores");
@@ -1675,9 +1915,10 @@ CMD:ajuda(playerid, params[])
     return 1;
 }
 
-CMD:help(playerid, params[])
+dcmd_help(playerid, const params[])
 {
-    return cmd_ajuda(playerid, params);
+    #pragma unused params
+    return dcmd_ajuda(playerid, "");
 }
 
 
@@ -1685,20 +1926,88 @@ CMD:help(playerid, params[])
 // ADMIN COMMANDS (Opcional)
 // =============================================================================
 
-CMD:reloadmaps(playerid, params[])
+// Diagnostico: mostra tudo que importa para descobrir por que o mapa nao aparece
+dcmd_diag(playerid, const params[])
 {
+    #pragma unused params
+    new str[160];
+    new pvw = GetPlayerVirtualWorld(playerid);
+
+    SCM(playerid, COLOR_GREEN, "========== DIAGNOSTICO DERBY ==========");
+
+    format(str, sizeof(str), "Mapas na lista: {FFFF00}%d{FFFFFF}   Tabela vworlds: {FFFF00}%d", TOTAL_DERBYS, VW_TOTAL);
+    SCM(playerid, COLOR_WHITE, str);
+
+    if(TOTAL_DERBYS <= 0)
+    {
+        SCM(playerid, COLOR_RED, ">> scriptfiles/DERBY/ NAO foi encontrado. Nada mais vai funcionar.");
+        return 1;
+    }
+
+    format(str, sizeof(str), "Mapa atual: id {FFFF00}%d{FFFFFF}  nome {FFFF00}%s", DI[D_ID], DI[D_NAME]);
+    SCM(playerid, COLOR_WHITE, str);
+
+    format(str, sizeof(str), "Arquivo: {FFFF00}%s", DERBY_FILENAMES[DI[D_ID]]);
+    SCM(playerid, COLOR_WHITE, str);
+
+    format(str, sizeof(str), "VW do mapa: {FFFF00}%d{FFFFFF}   Seu VW: {FFFF00}%d{FFFFFF}   %s",
+        DI[D_VW], pvw, (DI[D_VW] == pvw) ? ("{00FF00}(iguais - OK)") : ("{FF0000}(DIVERGENTE!)"));
+    SCM(playerid, COLOR_WHITE, str);
+
+    format(str, sizeof(str), "Veiculo do mapa: {FFFF00}%d{FFFFFF}   Z de eliminacao: {FFFF00}%.1f", DI[D_VEHICLE], DI[D_ZPOS]);
+    SCM(playerid, COLOR_WHITE, str);
+
+    format(str, sizeof(str), "Spawn 1 do mapa: {FFFF00}%.1f, %.1f, %.1f",
+        DERBY_SPAWN[0][0], DERBY_SPAWN[0][1], DERBY_SPAWN[0][2]);
+    SCM(playerid, COLOR_WHITE, str);
+
+    new Float:px, Float:py, Float:pz;
+    GetPlayerPos(playerid, px, py, pz);
+    format(str, sizeof(str), "Sua posicao agora: {FFFF00}%.1f, %.1f, %.1f", px, py, pz);
+    SCM(playerid, COLOR_WHITE, str);
+
+    SCM(playerid, COLOR_GREEN, "---------------- como ler ----------------");
+    if(DERBY_SPAWN[0][0] == 0.0 && DERBY_SPAWN[0][1] == 0.0)
+        SCM(playerid, COLOR_RED, ">> Spawn zerado: o arquivo .sfr nao foi lido.");
+    else
+        SCM(playerid, COLOR_GREY, ">> Spawn tem coordenadas: o .sfr foi lido corretamente.");
+
+    if(DI[D_VW] != pvw)
+        SCM(playerid, COLOR_RED, ">> Seu VW nao bate com o do mapa. Avise o desenvolvedor.");
+    else
+        SCM(playerid, COLOR_GREY, ">> VW correto. Se nao ha plataforma, o filterscript SFRDERBY nao esta ativo.");
+
+    SCM(playerid, COLOR_GREY, ">> No console deve aparecer: MAPAS DERBY CARGADOS || MAPAS: 52");
+    SCM(playerid, COLOR_GREY, ">> Se nao aparecer: falta 'plugins streamer' ou 'filterscripts SFRDERBY'.");
+    return 1;
+}
+
+dcmd_cla(playerid, const params[])
+{
+    #pragma unused params
+    if(!IsPlayerAdmin(playerid))
+        return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON pode usar /cla.");
+    return ClaShowPanel(playerid);
+}
+
+dcmd_reloadmaps(playerid, const params[])
+{
+    #pragma unused params
     if(!IsPlayerAdmin(playerid))
         return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON admins podem usar este comando.");
 
-    LoadDerbyNames("DERBY/derbys.sfr");
+    LoadVirtualWorlds();
+    LoadDerbyMapList();
+    CacheMapNames();
     new str[64];
     format(str, sizeof(str), "| ADMIN | Mapas recarregados. Total: %d mapas.", TOTAL_DERBYS);
     SCM(playerid, COLOR_GREEN, str);
     return 1;
 }
 
-CMD:skimap(playerid, params[])
+dcmd_skimap(playerid, const params[])
 {
+    #pragma unused params
     if(!IsPlayerAdmin(playerid))
         return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON admins podem usar este comando.");
 
@@ -1716,7 +2025,7 @@ CMD:skimap(playerid, params[])
     return 1;
 }
 
-CMD:setmap(playerid, params[])
+dcmd_setmap(playerid, const params[])
 {
     if(!IsPlayerAdmin(playerid))
         return SCM(playerid, COLOR_RED, "[ERRO]: Apenas RCON admins podem usar este comando.");
