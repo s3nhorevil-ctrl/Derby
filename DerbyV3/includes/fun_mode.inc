@@ -128,7 +128,7 @@ stock CheckFunRoomAutoStart()
 {
     if(RoomData[FUN_ROOM_ID][ROOM_STATE] == ROOM_STATE_LOBBY)
     {
-        if(RoomData[FUN_ROOM_ID][ROOM_PLAYER_COUNT] >= 2)
+        if(RoomData[FUN_ROOM_ID][ROOM_PLAYER_COUNT] >= 1)
         {
             StartRoomMatch(FUN_ROOM_ID);
         }

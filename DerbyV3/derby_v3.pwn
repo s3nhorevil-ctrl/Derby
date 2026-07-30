@@ -97,6 +97,8 @@ public OnGameModeInit()
     // Inicializar salas
     InitAllRooms();
     
+    printf("[DERBY] Sala FUN: %d mapas selecionados", RoomData[FUN_ROOM_ID][ROOM_MAP_COUNT]);
+    
     // Timers globais
     SetTimer("NitroUpdateTimer", NITRO_UPDATE_INTERVAL, true);
     SetTimer("AntiAFKCheck", 1000, true);
