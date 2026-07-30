@@ -15,7 +15,8 @@ enum CLAINFO
     CLA_ROUNDS,             // total de rounds configurado
     CLA_ROUND_ATUAL,        // round atual
     CLA_PONTOS[2],          // placar CLA1 x CLA2
-    CLA_TIMEOUT_TIMER       // timer do round
+    CLA_TIMEOUT_TIMER,      // timer do round
+    bool:CLA_TREINO         // modo treinamento (respawn automatico)
 };
 
 new CLA[CLAINFO];
@@ -64,6 +65,7 @@ ClaCountTotal()
 ClaReset()
 {
     CLA[CLA_ATIVO] = false;
+    CLA[CLA_TREINO] = false;
     CLA[CLA_RODANDO] = false;
     CLA[CLA_PAUSADO] = false;
     CLA[CLA_MAPA] = 0;
@@ -111,6 +113,11 @@ ClaShowPanel(playerid)
         strcat(info, "{00FF00}>> DESPAUSAR ROUND\t{00FF00}-\n");
     else
         strcat(info, "{00FF00}>> INICIAR ROUND\t{00FF00}-\n");
+
+    if(!CLA[CLA_TREINO])
+        strcat(info, "{00FFFF}>> INICIAR TREINAMENTO\t{00FFFF}(respawn ao cair)\n");
+    else
+        strcat(info, "{FF6600}>> PARAR TREINAMENTO\t{FF6600}-\n");
 
     format(linha, sizeof(linha), "{CCCCCC}Placar: {FF0000}CLA1 %d {FFFFFF}x {0066FF}%d CLA2 {CCCCCC}| Round %d/%d\t-\n",
         CLA[CLA_PONTOS][0], CLA[CLA_PONTOS][1], CLA[CLA_ROUND_ATUAL], CLA[CLA_ROUNDS]);
@@ -328,6 +335,37 @@ ClaPlayerDied(playerid)
         CLA_VEHICLEID[playerid] = INVALID_VEHICLE_ID;
     }
 
+    // MODO TREINAMENTO: respawna automaticamente na plataforma
+    if(CLA[CLA_TREINO])
+    {
+        new slot = CLA_POSITION[playerid];
+        new Float:x = DERBY_SPAWN[slot][0];
+        new Float:y = DERBY_SPAWN[slot][1];
+        new Float:z = DERBY_SPAWN[slot][2] + 2.0;
+        new Float:a = DERBY_SPAWN[slot][3];
+
+        CLA_VEHICLEID[playerid] = CreateVehicle(CLA[CLA_VEICULO], x, y, z, a, -1, -1, 99999, false);
+        SetVehicleVirtualWorld(CLA_VEHICLEID[playerid], DI[D_VW]);
+        PutPlayerInVehicle(playerid, CLA_VEHICLEID[playerid], 0);
+        SetVehicleParamsEx(CLA_VEHICLEID[playerid], VEHICLE_PARAMS_ON, VEHICLE_PARAMS_ON, VEHICLE_PARAMS_OFF, 1, 0, 0, 0);
+        AddVehicleComponent(CLA_VEHICLEID[playerid], 1010); // Nitro
+        TogglePlayerControllable(playerid, true);
+
+        // Frase comica de respawn
+        new frase[50];
+        switch(random(5))
+        {
+            case 0: frase = "~r~CAIU! ~w~Tenta de novo!";
+            case 1: frase = "~r~FAIL! ~w~Mais uma vez!";
+            case 2: frase = "~r~OPS! ~w~Voltando...";
+            case 3: frase = "~r~MERGULHOU! ~w~De novo!";
+            case 4: frase = "~r~TOMBOU! ~w~Vai la!";
+        }
+        GameTextForPlayer(playerid, frase, 2000, 3);
+        return 1;
+    }
+
+    // MODO COMPETITIVO: eliminado de verdade
     new msg[128];
     format(msg, sizeof(msg), "{FF0000}| CLA | %s foi eliminado!", PI[playerid][P_NAME]);
     ClaSendMsg(COLOR_RED, msg);
@@ -349,17 +387,12 @@ ClaPlayerDied(playerid)
     new alive1 = ClaCountAlive(1);
 
     if(alive0 == 0 && alive1 == 0)
-    {
-        ClaEndRound(-1); // empate
-    }
+        ClaEndRound(-1);
     else if(alive0 == 0)
-    {
-        ClaEndRound(1); // CLA2 venceu
-    }
+        ClaEndRound(1);
     else if(alive1 == 0)
-    {
-        ClaEndRound(0); // CLA1 venceu
-    }
+        ClaEndRound(0);
+
     return 1;
 }
 
@@ -537,8 +570,24 @@ ClaHandleDialog(playerid, dialogid, response, listitem, inputtext[])
                         ClaStartRound(playerid);
                     ClaShowPanel(playerid);
                 }
-                case 5: ClaShowPanel(playerid); // Placar (nao faz nada, so info)
-                case 6: // ENCERRAR
+                case 5: // TREINAMENTO
+                {
+                    CLA[CLA_TREINO] = !CLA[CLA_TREINO];
+                    if(CLA[CLA_TREINO])
+                    {
+                        ClaSendMsg(COLOR_GREEN, "{00FFFF}| CLA | TREINAMENTO ativado! Ao cair voce volta automaticamente.");
+                        // Se tem mapa carregado, libera todos
+                        if(CLA[CLA_MAPA] >= 0 && CLA[CLA_MAPA] < TOTAL_DERBYS)
+                            ClaLoadMapAndTP(CLA[CLA_MAPA]);
+                    }
+                    else
+                    {
+                        ClaSendMsg(COLOR_ORANGE, "{FF6600}| CLA | TREINAMENTO desativado.");
+                    }
+                    ClaShowPanel(playerid);
+                }
+                case 6: ClaShowPanel(playerid); // Placar (nao faz nada, so info)
+                case 7: // ENCERRAR
                 {
                     ClaEncerrar();
                 }
