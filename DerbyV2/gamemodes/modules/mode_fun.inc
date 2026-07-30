@@ -3,9 +3,7 @@
 // =============================================================================
 
 new ModeFun_CurrentMap = 0;
-new ModeFun_WaitTimer = -1;
 
-forward ModeFun_WaitCheck();
 
 // =============================================================================
 // JOGADOR ENTRA NO MODO FUN

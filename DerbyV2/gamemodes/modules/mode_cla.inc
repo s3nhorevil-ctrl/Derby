@@ -468,8 +468,10 @@ stock Cla_ShowPanel(playerid)
     format(tmp, sizeof(tmp), C_WHITE "Veiculo\t" C_GREEN "%d\n", Cla[cVehicle]);
     strcat(info, tmp);
 
-    format(tmp, sizeof(tmp), C_WHITE "Mapa\t" C_GREEN "%s\n",
-        (Cla[cMapID] >= 0 && Cla[cMapID] < TotalMaps) ? MapInfo[Cla[cMapID]][mapName] : "Nenhum");
+    if(Cla[cMapID] >= 0 && Cla[cMapID] < TotalMaps)
+        format(tmp, sizeof(tmp), C_WHITE "Mapa\t" C_GREEN "%s\n", MapInfo[Cla[cMapID]][mapName]);
+    else
+        format(tmp, sizeof(tmp), C_WHITE "Mapa\t" C_GREEN "Nenhum\n");
     strcat(info, tmp);
 
     format(tmp, sizeof(tmp), C_WHITE "Rounds\t" C_GREEN "%d\n", Cla[cRounds]);
@@ -519,7 +521,7 @@ stock Cla_ShowMembers(playerid)
     for(new i = 0, i_j = GetPlayerPoolSize(); i <= i_j; i++) if(IsPlayerConnected(i))
     {
         if(!IsPlayerInCla(i)) continue;
-        new team_txt[16];
+        new team_txt[32];
         if(Player[i][pClaTeam] == 0) team_txt = C_RED "CLA 1";
         else if(Player[i][pClaTeam] == 1) team_txt = C_BLUE "CLA 2";
         else team_txt = C_GREY "Sem time";
