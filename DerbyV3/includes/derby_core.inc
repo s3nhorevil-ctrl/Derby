@@ -224,10 +224,6 @@ new MapFilenames[MAX_DERBYS][48];
 // Sala FUN publica (sempre existe)
 #define FUN_ROOM_ID     0
 
-// Database
-new DB:DerbyDB;
-new DB_Query[512];
-
 // =============================================================================
 // LISTA DE VEICULOS PERMITIDOS
 // =============================================================================
@@ -311,17 +307,17 @@ new const DerbyVehicles[][E_VEHICLE_INFO] = {
 
 stock GetPlayerNameEx(playerid)
 {
-    static name[MAX_PLAYER_NAME + 1];
-    GetPlayerName(playerid, name, sizeof(name));
+    new name[MAX_PLAYER_NAME + 1];
+    GetPlayerName(playerid, name, sizeof name);
     return name;
 }
 
 stock TimeToString(seconds)
 {
-    static tmp[16];
+    new tmp[16];
     new minutes = seconds / 60;
     seconds -= minutes * 60;
-    format(tmp, sizeof(tmp), "%d:%02d", minutes, seconds);
+    format(tmp, sizeof tmp, "%d:%02d", minutes, seconds);
     return tmp;
 }
 
@@ -340,13 +336,13 @@ stock StripNewLine(string[])
 
 stock GetVehicleNameByModel(modelid)
 {
-    static name[24];
-    format(name, sizeof(name), "Desconhecido");
+    new name[24];
+    format(name, sizeof name, "Desconhecido");
     for(new i = 0; i < TOTAL_DERBY_VEHICLES; i++)
     {
         if(DerbyVehicles[i][VEH_MODEL] == modelid)
         {
-            format(name, sizeof(name), "%s", DerbyVehicles[i][VEH_NAME]);
+            format(name, sizeof name, "%s", DerbyVehicles[i][VEH_NAME]);
             break;
         }
     }
@@ -392,29 +388,23 @@ stock DestroyVehicleSafe(vehicleid)
 
 stock GetModeName(mode)
 {
-    static name[20];
-    switch(mode)
-    {
-        case MODE_FUN: format(name, sizeof(name), "FUN");
-        case MODE_TRAINING: format(name, sizeof(name), "Treinamento");
-        case MODE_CLA_VS_CLA: format(name, sizeof(name), "CLA vs CLA");
-        default: format(name, sizeof(name), "Desconhecido");
-    }
+    new name[20];
+    if(mode == MODE_FUN) format(name, sizeof name, "FUN");
+    else if(mode == MODE_TRAINING) format(name, sizeof name, "Treinamento");
+    else if(mode == MODE_CLA_VS_CLA) format(name, sizeof name, "CLA vs CLA");
+    else format(name, sizeof name, "Desconhecido");
     return name;
 }
 
 stock GetRoomStateName(state)
 {
-    static name[20];
-    switch(state)
-    {
-        case ROOM_STATE_EMPTY: format(name, sizeof(name), "Vazia");
-        case ROOM_STATE_LOBBY: format(name, sizeof(name), "Aguardando");
-        case ROOM_STATE_COUNTDOWN: format(name, sizeof(name), "Iniciando");
-        case ROOM_STATE_RUNNING: format(name, sizeof(name), "Em Partida");
-        case ROOM_STATE_ROUND_END: format(name, sizeof(name), "Fim de Round");
-        case ROOM_STATE_FINISHED: format(name, sizeof(name), "Finalizada");
-        default: format(name, sizeof(name), "---");
-    }
+    new name[20];
+    if(state == ROOM_STATE_EMPTY) format(name, sizeof name, "Vazia");
+    else if(state == ROOM_STATE_LOBBY) format(name, sizeof name, "Aguardando");
+    else if(state == ROOM_STATE_COUNTDOWN) format(name, sizeof name, "Iniciando");
+    else if(state == ROOM_STATE_RUNNING) format(name, sizeof name, "Em Partida");
+    else if(state == ROOM_STATE_ROUND_END) format(name, sizeof name, "Fim de Round");
+    else if(state == ROOM_STATE_FINISHED) format(name, sizeof name, "Finalizada");
+    else format(name, sizeof name, "---");
     return name;
 }

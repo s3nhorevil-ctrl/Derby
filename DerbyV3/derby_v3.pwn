@@ -18,7 +18,6 @@
         - Vehicle preview (TextDraw 3D model)
         - Anti-AFK
         - Spectate
-        - SQLite Database
     
     Includes necessarios:
         - a_samp.inc
@@ -68,40 +67,8 @@ main()
 }
 
 // =============================================================================
-// DATABASE
+// DATABASE - REMOVIDO (sem SQL)
 // =============================================================================
-
-stock InitDatabase()
-{
-    DerbyDB = db_open("derby_v3.db");
-    if(!db_is_valid_handle(DerbyDB))
-    {
-        printf("[DERBY] ERRO: Nao foi possivel abrir o banco de dados!");
-        return 0;
-    }
-    
-    db_query(DerbyDB, "CREATE TABLE IF NOT EXISTS player_stats (\
-        player_name VARCHAR(24) PRIMARY KEY, \
-        wins INTEGER DEFAULT 0, \
-        losses INTEGER DEFAULT 0, \
-        plays INTEGER DEFAULT 0, \
-        score_total INTEGER DEFAULT 0, \
-        last_played TIMESTAMP DEFAULT CURRENT_TIMESTAMP \
-    )");
-    
-    printf("[DERBY] Banco de dados inicializado.");
-    return 1;
-}
-
-stock RegisterPlayer(playerid)
-{
-    if(!db_is_valid_handle(DerbyDB)) return 0;
-    format(DB_Query, sizeof(DB_Query), "INSERT OR IGNORE INTO player_stats (player_name) VALUES ('%s')",
-        PlayerData[playerid][PL_NAME]);
-    db_query(DerbyDB, DB_Query);
-    return 1;
-}
-
 
 // =============================================================================
 // OnGameModeInit
@@ -127,9 +94,6 @@ public OnGameModeInit()
     LoadMapList("DERBY/derbys.sfr");
     LoadAllMaps();
     
-    // Inicializar banco de dados
-    InitDatabase();
-    
     // Inicializar salas
     InitAllRooms();
     
@@ -149,8 +113,6 @@ public OnGameModeInit()
 
 public OnGameModeExit()
 {
-    if(db_is_valid_handle(DerbyDB))
-        db_close(DerbyDB);
     return 1;
 }
 
@@ -181,9 +143,6 @@ public OnPlayerConnect(playerid)
     
     // Criar textdraw per-player (Vehicle HP)
     CreateVehicleHPTextDraw(playerid);
-    
-    // Registrar no banco
-    RegisterPlayer(playerid);
     
     // Mensagem de boas vindas
     SCM(playerid, COLOR_GREEN, "=============================================");
@@ -465,73 +424,67 @@ CMD:iniciar(playerid, params[])
 
 CMD:stats(playerid, params[])
 {
-    if(!db_is_valid_handle(DerbyDB))
-        return SCM(playerid, COLOR_RED, "[ERRO] Banco de dados indisponivel.");
-    
-    format(DB_Query, sizeof(DB_Query),
-        "SELECT wins, losses, plays, score_total FROM player_stats WHERE player_name = '%s'",
-        PlayerData[playerid][PL_NAME]);
-    new DBResult:result = db_query(DerbyDB, DB_Query);
-    
-    if(db_num_rows(result) > 0)
-    {
-        new wins[10], losses[10], plays[10], score[10];
-        db_get_field_assoc(result, "wins", wins, sizeof(wins));
-        db_get_field_assoc(result, "losses", losses, sizeof(losses));
-        db_get_field_assoc(result, "plays", plays, sizeof(plays));
-        db_get_field_assoc(result, "score_total", score, sizeof(score));
-        
-        new str[256];
-        SCM(playerid, COLOR_GREEN, "============ SUAS ESTATISTICAS ============");
-        format(str, sizeof(str), "   Vitorias: {00FF00}%s  {FFFFFF}| Derrotas: {FF0000}%s  {FFFFFF}| Partidas: {FFFF00}%s",
-            wins, losses, plays);
-        SCM(playerid, COLOR_WHITE, str);
-        format(str, sizeof(str), "   Score Total: {00FF00}%s", score);
-        SCM(playerid, COLOR_WHITE, str);
-        SCM(playerid, COLOR_GREEN, "============================================");
-    }
-    else
-    {
-        SCM(playerid, COLOR_ORANGE, "| DERBY | Nenhuma estatistica encontrada.");
-    }
-    db_free_result(result);
+    new str[256];
+    SCM(playerid, COLOR_GREEN, "============ SUAS ESTATISTICAS ============");
+    format(str, sizeof str, "   Vitorias: {00FF00}%d  {FFFFFF}| Derrotas: {FF0000}%d  {FFFFFF}| Score: {FFFF00}%d",
+        PlayerData[playerid][PL_WINS], PlayerData[playerid][PL_LOSSES], PlayerData[playerid][PL_SCORE]);
+    SCM(playerid, COLOR_WHITE, str);
+    SCM(playerid, COLOR_GREEN, "============================================");
     return 1;
 }
 
 CMD:top(playerid, params[])
 {
-    if(!db_is_valid_handle(DerbyDB))
-        return SCM(playerid, COLOR_RED, "[ERRO] Banco de dados indisponivel.");
+    SCM(playerid, COLOR_GREEN, "========== TOP JOGADORES (sessao) ==========");
     
-    format(DB_Query, sizeof(DB_Query),
-        "SELECT player_name, wins, score_total FROM player_stats ORDER BY wins DESC LIMIT 10");
-    new DBResult:result = db_query(DerbyDB, DB_Query);
-    
-    if(db_num_rows(result) > 0)
+    // Ordenar por wins na sessao atual
+    new topPlayers[10], topWins[10], count = 0;
+    for(new i = 0; i < MAX_PLAYERS; i++)
     {
-        SCM(playerid, COLOR_GREEN, "========== TOP 10 JOGADORES ==========");
-        new pos = 1;
-        new name[24], wins[10], score[10], str[128];
+        if(!IsPlayerConnected(i)) continue;
+        if(PlayerData[i][PL_WINS] <= 0) continue;
         
-        while(db_num_rows(result) > 0)
+        // Inserir ordenado
+        new inserted = false;
+        for(new j = 0; j < count && j < 10; j++)
         {
-            db_get_field_assoc(result, "player_name", name, sizeof(name));
-            db_get_field_assoc(result, "wins", wins, sizeof(wins));
-            db_get_field_assoc(result, "score_total", score, sizeof(score));
-            
-            format(str, sizeof(str), "  #%d - %s | Vitorias: %s | Score: %s", pos, name, wins, score);
-            SCM(playerid, COLOR_WHITE, str);
-            
-            pos++;
-            if(!db_next_row(result)) break;
+            if(PlayerData[i][PL_WINS] > topWins[j])
+            {
+                // Deslocar para baixo
+                for(new k = 9; k > j; k--)
+                {
+                    topPlayers[k] = topPlayers[k-1];
+                    topWins[k] = topWins[k-1];
+                }
+                topPlayers[j] = i;
+                topWins[j] = PlayerData[i][PL_WINS];
+                inserted = true;
+                break;
+            }
         }
-        SCM(playerid, COLOR_GREEN, "======================================");
+        if(!inserted && count < 10)
+        {
+            topPlayers[count] = i;
+            topWins[count] = PlayerData[i][PL_WINS];
+        }
+        if(count < 10) count++;
+    }
+    
+    if(count == 0)
+    {
+        SCM(playerid, COLOR_ORANGE, "  Nenhuma vitoria registrada nesta sessao.");
     }
     else
     {
-        SCM(playerid, COLOR_ORANGE, "| DERBY | Nenhuma estatistica encontrada.");
+        new str[128];
+        for(new i = 0; i < count; i++)
+        {
+            format(str, sizeof str, "  #%d - %s | Vitorias: %d | Score: %d",
+                i + 1, PlayerData[topPlayers[i]][PL_NAME], topWins[i], PlayerData[topPlayers[i]][PL_SCORE]);
+            SCM(playerid, COLOR_WHITE, str);
+        }
     }
-    db_free_result(result);
+    SCM(playerid, COLOR_GREEN, "=============================================");
     return 1;
 }
 
@@ -552,7 +505,17 @@ CMD:ajuda(playerid, params[])
 
 CMD:help(playerid, params[])
 {
-    return cmd_ajuda(playerid, params);
+    SCM(playerid, COLOR_GREEN, "============ DERBY V3 - COMANDOS ============");
+    SCM(playerid, COLOR_WHITE, "  /derby    - Menu principal (FUN/Treino/Criar Sala)");
+    SCM(playerid, COLOR_WHITE, "  /sair     - Sair da sala atual");
+    SCM(playerid, COLOR_WHITE, "  /host     - Controles do Host (se for Host)");
+    SCM(playerid, COLOR_WHITE, "  /iniciar  - Iniciar partida (Host)");
+    SCM(playerid, COLOR_WHITE, "  /stats    - Ver suas estatisticas");
+    SCM(playerid, COLOR_WHITE, "  /top      - Ranking top 10");
+    SCM(playerid, COLOR_WHITE, "  /sala     - Info da sala atual");
+    SCM(playerid, COLOR_GREEN, "=============================================");
+    SCM(playerid, COLOR_GREY, "Nitro: Segure o botao de TIRO para ativar!");
+    return 1;
 }
 
 
