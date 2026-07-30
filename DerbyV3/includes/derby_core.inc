@@ -305,20 +305,16 @@ new const DerbyVehicles[][E_VEHICLE_INFO] = {
 // FUNCOES UTILITARIAS
 // =============================================================================
 
-stock GetPlayerNameEx(playerid)
+stock GetPlayerNameEx(playerid, dest[], len)
 {
-    new name[MAX_PLAYER_NAME + 1];
-    GetPlayerName(playerid, name, sizeof name);
-    return name;
+    GetPlayerName(playerid, dest, len);
 }
 
-stock TimeToString(seconds)
+stock TimeToString(seconds, dest[], len)
 {
-    new tmp[16];
     new minutes = seconds / 60;
     seconds -= minutes * 60;
-    format(tmp, sizeof tmp, "%d:%02d", minutes, seconds);
-    return tmp;
+    format(dest, len, "%d:%02d", minutes, seconds);
 }
 
 stock RandomEx(min, max)
@@ -334,19 +330,17 @@ stock StripNewLine(string[])
     return 1;
 }
 
-stock GetVehicleNameByModel(modelid)
+stock GetVehicleNameByModel(modelid, dest[], len)
 {
-    new name[24];
-    format(name, sizeof name, "Desconhecido");
+    format(dest, len, "Desconhecido");
     for(new i = 0; i < TOTAL_DERBY_VEHICLES; i++)
     {
         if(DerbyVehicles[i][VEH_MODEL] == modelid)
         {
-            format(name, sizeof name, "%s", DerbyVehicles[i][VEH_NAME]);
+            format(dest, len, "%s", DerbyVehicles[i][VEH_NAME]);
             break;
         }
     }
-    return name;
 }
 
 stock GetVehicleModelByIndex(index)
@@ -386,25 +380,21 @@ stock DestroyVehicleSafe(vehicleid)
     }
 }
 
-stock GetModeName(mode)
+stock GetModeName(mode, dest[], len)
 {
-    new name[20];
-    if(mode == MODE_FUN) format(name, sizeof name, "FUN");
-    else if(mode == MODE_TRAINING) format(name, sizeof name, "Treinamento");
-    else if(mode == MODE_CLA_VS_CLA) format(name, sizeof name, "CLA vs CLA");
-    else format(name, sizeof name, "Desconhecido");
-    return name;
+    if(mode == MODE_FUN) format(dest, len, "FUN");
+    else if(mode == MODE_TRAINING) format(dest, len, "Treinamento");
+    else if(mode == MODE_CLA_VS_CLA) format(dest, len, "CLA vs CLA");
+    else format(dest, len, "Desconhecido");
 }
 
-stock GetRoomStateName(state)
+stock GetRoomStateName(state, dest[], len)
 {
-    new name[20];
-    if(state == ROOM_STATE_EMPTY) format(name, sizeof name, "Vazia");
-    else if(state == ROOM_STATE_LOBBY) format(name, sizeof name, "Aguardando");
-    else if(state == ROOM_STATE_COUNTDOWN) format(name, sizeof name, "Iniciando");
-    else if(state == ROOM_STATE_RUNNING) format(name, sizeof name, "Em Partida");
-    else if(state == ROOM_STATE_ROUND_END) format(name, sizeof name, "Fim de Round");
-    else if(state == ROOM_STATE_FINISHED) format(name, sizeof name, "Finalizada");
-    else format(name, sizeof name, "---");
-    return name;
+    if(state == ROOM_STATE_EMPTY) format(dest, len, "Vazia");
+    else if(state == ROOM_STATE_LOBBY) format(dest, len, "Aguardando");
+    else if(state == ROOM_STATE_COUNTDOWN) format(dest, len, "Iniciando");
+    else if(state == ROOM_STATE_RUNNING) format(dest, len, "Em Partida");
+    else if(state == ROOM_STATE_ROUND_END) format(dest, len, "Fim de Round");
+    else if(state == ROOM_STATE_FINISHED) format(dest, len, "Finalizada");
+    else format(dest, len, "---");
 }

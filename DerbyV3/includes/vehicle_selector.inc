@@ -54,7 +54,9 @@ stock CreateVehiclePreviewTextDraws()
 stock ShowVehiclePreview(playerid, modelid)
 {
     TextDrawSetPreviewModel(TD_VehiclePreview, modelid);
-    TextDrawSetString(TD_VehiclePreviewName, GetVehicleNameByModel(modelid));
+    new vname[24];
+    GetVehicleNameByModel(modelid, vname, sizeof(vname));
+    TextDrawSetString(TD_VehiclePreviewName, vname);
     
     TextDrawShowForPlayer(playerid, TD_VehiclePreviewBG);
     TextDrawShowForPlayer(playerid, TD_VehiclePreview);

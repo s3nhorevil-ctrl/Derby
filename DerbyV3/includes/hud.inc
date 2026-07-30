@@ -196,7 +196,7 @@ stock UpdateRoomTimerHUD(roomid)
     if(roomid < 0 || roomid >= MAX_ROOMS) return 0;
     
     new str[32];
-    format(str, sizeof(str), "%s", TimeToString(RoomData[roomid][ROOM_TIMEOUT_VALUE]));
+    TimeToString(RoomData[roomid][ROOM_TIMEOUT_VALUE], str, sizeof(str));
     TextDrawSetString(TD_Timer, str);
     
     // Vivos
