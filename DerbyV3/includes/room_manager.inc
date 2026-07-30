@@ -116,13 +116,13 @@ stock JoinRoom(playerid, roomid)
     {
         case ROOM_STATE_LOBBY, ROOM_STATE_COUNTDOWN:
         {
-            PlayerData[playerid][PL_STATE] = PLAYER_STATE_LOBBY;
+            PlayerData[playerid][PL_STATE] = PL_ST_LOBBY;
             SetPlayerVirtualWorld(playerid, GetRoomVirtualWorld(roomid));
         }
         case ROOM_STATE_RUNNING:
         {
             // Entrou durante partida - spectate
-            PlayerData[playerid][PL_STATE] = PLAYER_STATE_SPECTATING;
+            PlayerData[playerid][PL_STATE] = PL_ST_SPECTATING;
             SetPlayerVirtualWorld(playerid, GetRoomVirtualWorld(roomid));
             StartSpectating(playerid, roomid);
         }
@@ -160,13 +160,13 @@ stock LeaveRoom(playerid)
         RoomSlotUsed[roomid][slot] = false;
     
     // Se estava vivo, decrementar
-    if(PlayerData[playerid][PL_STATE] == PLAYER_STATE_ALIVE)
+    if(PlayerData[playerid][PL_STATE] == PL_ST_ALIVE)
     {
         RoomData[roomid][ROOM_ALIVE_COUNT]--;
     }
     
     // Parar spectate
-    if(GetPlayerState(playerid) == 9) // PLAYER_STATE_SPECTATING
+    if(GetPlayerState(playerid) == 9) // PL_ST_SPECTATING
         TogglePlayerSpectating(playerid, false);
     
     // Esconder HUD
@@ -174,7 +174,7 @@ stock LeaveRoom(playerid)
     
     // Resetar dados do jogador
     PlayerData[playerid][PL_ROOM_ID] = INVALID_ROOM_ID;
-    PlayerData[playerid][PL_STATE] = PLAYER_STATE_NONE;
+    PlayerData[playerid][PL_STATE] = PL_ST_NONE;
     PlayerData[playerid][PL_IN_DERBY] = false;
     PlayerData[playerid][PL_TEAM] = TEAM_NONE;
     PlayerData[playerid][PL_SPAWN_SLOT] = -1;
@@ -310,7 +310,7 @@ stock SpawnRoomPlayers(roomid, mapid)
         if(GetPlayerState(i) == 9)
             TogglePlayerSpectating(i, false);
         
-        PlayerData[i][PL_STATE] = PLAYER_STATE_ALIVE;
+        PlayerData[i][PL_STATE] = PL_ST_ALIVE;
         PlayerData[i][PL_SPAWN_SLOT] = slot;
         RoomSlotUsed[roomid][slot] = true;
         
@@ -393,7 +393,7 @@ public RoomCountdown(roomid)
         {
             if(!IsPlayerConnected(i)) continue;
             if(PlayerData[i][PL_ROOM_ID] != roomid) continue;
-            if(PlayerData[i][PL_STATE] != PLAYER_STATE_ALIVE) continue;
+            if(PlayerData[i][PL_STATE] != PL_ST_ALIVE) continue;
             
             // Ligar motor
             SetVehicleParamsEx(PlayerData[i][PL_VEHICLE_ID], 1, 1, 0, 0, 0, 0, 0);
@@ -413,7 +413,7 @@ public RoomCountdown(roomid)
     {
         if(!IsPlayerConnected(i)) continue;
         if(PlayerData[i][PL_ROOM_ID] != roomid) continue;
-        if(PlayerData[i][PL_STATE] != PLAYER_STATE_ALIVE) continue;
+        if(PlayerData[i][PL_STATE] != PL_ST_ALIVE) continue;
         
         GameTextForPlayer(i, str, 1100, 3);
         PlayerPlaySound(i, 1056, 0.0, 0.0, 0.0);
@@ -464,10 +464,10 @@ stock PlayerEliminated(playerid)
 {
     new roomid = PlayerData[playerid][PL_ROOM_ID];
     if(roomid == INVALID_ROOM_ID) return 0;
-    if(PlayerData[playerid][PL_STATE] != PLAYER_STATE_ALIVE) return 0;
+    if(PlayerData[playerid][PL_STATE] != PL_ST_ALIVE) return 0;
     if(RoomData[roomid][ROOM_STATE] != ROOM_STATE_RUNNING) return 0;
     
-    PlayerData[playerid][PL_STATE] = PLAYER_STATE_DEAD;
+    PlayerData[playerid][PL_STATE] = PL_ST_DEAD;
     RoomData[roomid][ROOM_ALIVE_COUNT]--;
     
     // Destruir veiculo
@@ -494,7 +494,7 @@ stock PlayerEliminated(playerid)
     SendRoomMessage(roomid, COLOR_RED, str);
     
     // Colocar em spectate
-    PlayerData[playerid][PL_STATE] = PLAYER_STATE_SPECTATING;
+    PlayerData[playerid][PL_STATE] = PL_ST_SPECTATING;
     StartSpectating(playerid, roomid);
     
     // Verificar vencedor
@@ -522,7 +522,7 @@ stock CheckRoomWinner(roomid)
         for(new i = 0; i < MAX_PLAYERS; i++)
         {
             if(IsPlayerConnected(i) && PlayerData[i][PL_ROOM_ID] == roomid
-                && PlayerData[i][PL_STATE] == PLAYER_STATE_ALIVE)
+                && PlayerData[i][PL_STATE] == PL_ST_ALIVE)
             {
                 winner = i;
                 break;
@@ -663,7 +663,7 @@ public RoomTransition(roomid)
         if(GetPlayerState(i) == 9) // spectating
             TogglePlayerSpectating(i, false);
         
-        PlayerData[i][PL_STATE] = PLAYER_STATE_LOBBY;
+        PlayerData[i][PL_STATE] = PL_ST_LOBBY;
     }
     
     if(RoomData[roomid][ROOM_STATE] == ROOM_STATE_FINISHED && roomid != FUN_ROOM_ID)
@@ -706,7 +706,7 @@ stock StartSpectating(playerid, roomid)
     for(new i = 0; i < MAX_PLAYERS; i++)
     {
         if(IsPlayerConnected(i) && PlayerData[i][PL_ROOM_ID] == roomid
-            && PlayerData[i][PL_STATE] == PLAYER_STATE_ALIVE && i != playerid)
+            && PlayerData[i][PL_STATE] == PL_ST_ALIVE && i != playerid)
         {
             target = i;
             break;
@@ -741,7 +741,7 @@ stock NextSpectateTarget(playerid)
     {
         if(!IsPlayerConnected(i)) continue;
         if(PlayerData[i][PL_ROOM_ID] != roomid) continue;
-        if(PlayerData[i][PL_STATE] != PLAYER_STATE_ALIVE) continue;
+        if(PlayerData[i][PL_STATE] != PL_ST_ALIVE) continue;
         if(i == playerid) continue;
         
         if(first == INVALID_PLAYER) first = i;
@@ -806,7 +806,7 @@ stock RespawnPlayerTraining(playerid)
     SetVehicleVirtualWorld(vid, GetRoomVirtualWorld(roomid));
     PutPlayerInVehicle(playerid, vid, 0);
     PlayerData[playerid][PL_VEHICLE_ID] = vid;
-    PlayerData[playerid][PL_STATE] = PLAYER_STATE_ALIVE;
+    PlayerData[playerid][PL_STATE] = PL_ST_ALIVE;
     PlayerData[playerid][PL_NITRO_FUEL] = 100.0;
     PlayerData[playerid][PL_NITRO_ACTIVE] = false;
     

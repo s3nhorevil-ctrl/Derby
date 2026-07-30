@@ -10,27 +10,32 @@
 #endif
 #define _derby_core_included
 
+// Definicoes de seguranca caso nao existam no include
+#if !defined DIALOG_STYLE_TABLIST_HEADERS
+    #define DIALOG_STYLE_TABLIST_HEADERS 5
+#endif
+
 // =============================================================================
 // CONFIGURACOES GLOBAIS
 // =============================================================================
 
 #undef MAX_PLAYERS
-#define MAX_PLAYERS             (50)
+#define MAX_PLAYERS             50
 
 #define GAMEMODETEXT            "Derby V3 - Salas"
 #define HOSTNAME                "Derby V3 - Sistema de Salas Personalizadas"
 
-#define MAX_ROOMS               (10)
-#define MAX_ROOM_PLAYERS        (20)
-#define MAX_DERBYS              (200)
-#define MAX_ROOM_MAPS           (50)
-#define MAX_ROUNDS              (20)
+#define MAX_ROOMS               10
+#define MAX_ROOM_PLAYERS        20
+#define MAX_DERBYS              200
+#define MAX_ROOM_MAPS           50
+#define MAX_ROUNDS              20
 
-#define DERBY_BASE_VW           (100)
-#define DERBY_TIMEOUT_SECONDS   (180)
-#define DERBY_COUNTDOWN_SECONDS (10)
-#define AFK_WARNING_SECONDS     (10)
-#define AFK_KICK_SECONDS        (20)
+#define DERBY_BASE_VW           100
+#define DERBY_TIMEOUT_SECONDS   180
+#define DERBY_COUNTDOWN_SECONDS 10
+#define AFK_WARNING_SECONDS     10
+#define AFK_KICK_SECONDS        20
 
 #define INVALID_ROOM_ID         (-1)
 #define NO_WINNER               (-1)
@@ -86,11 +91,11 @@ enum
 
 enum
 {
-    PLAYER_STATE_NONE = 0,    // Nao esta em nenhuma sala
-    PLAYER_STATE_LOBBY,       // Na sala, aguardando inicio
-    PLAYER_STATE_ALIVE,       // Vivo na partida
-    PLAYER_STATE_DEAD,        // Eliminado
-    PLAYER_STATE_SPECTATING   // Assistindo
+    PL_ST_NONE = 0,       // Nao esta em nenhuma sala
+    PL_ST_LOBBY,          // Na sala, aguardando inicio
+    PL_ST_ALIVE,          // Vivo na partida
+    PL_ST_DEAD,           // Eliminado
+    PL_ST_SPECTATING      // Assistindo
 };
 
 // =============================================================================
@@ -117,10 +122,10 @@ enum E_MAP_DATA
     MAP_VEHICLE,
     Float:MAP_ZMIN,
     MAP_SPAWNS,
-    Float:MAP_SPAWN_X[MAX_ROOM_PLAYERS],
-    Float:MAP_SPAWN_Y[MAX_ROOM_PLAYERS],
-    Float:MAP_SPAWN_Z[MAX_ROOM_PLAYERS],
-    Float:MAP_SPAWN_A[MAX_ROOM_PLAYERS]
+    Float:MAP_SPAWN_X[20],
+    Float:MAP_SPAWN_Y[20],
+    Float:MAP_SPAWN_Z[20],
+    Float:MAP_SPAWN_A[20]
 };
 
 // =============================================================================
@@ -144,7 +149,7 @@ enum E_ROOM_DATA
     ROOM_TOTAL_ROUNDS,
     ROOM_CURRENT_ROUND,
     ROOM_MAP_COUNT,
-    ROOM_SELECTED_MAPS[MAX_ROOM_MAPS],
+    ROOM_SELECTED_MAPS[50],
     ROOM_CURRENT_MAP_INDEX,
     
     // Jogadores
@@ -306,14 +311,14 @@ new const DerbyVehicles[][E_VEHICLE_INFO] = {
 
 stock GetPlayerNameEx(playerid)
 {
-    new name[MAX_PLAYER_NAME + 1];
+    static name[MAX_PLAYER_NAME + 1];
     GetPlayerName(playerid, name, sizeof(name));
     return name;
 }
 
 stock TimeToString(seconds)
 {
-    new tmp[16];
+    static tmp[16];
     new minutes = seconds / 60;
     seconds -= minutes * 60;
     format(tmp, sizeof(tmp), "%d:%02d", minutes, seconds);
@@ -335,7 +340,8 @@ stock StripNewLine(string[])
 
 stock GetVehicleNameByModel(modelid)
 {
-    new name[24] = "Desconhecido";
+    static name[24];
+    format(name, sizeof(name), "Desconhecido");
     for(new i = 0; i < TOTAL_DERBY_VEHICLES; i++)
     {
         if(DerbyVehicles[i][VEH_MODEL] == modelid)
@@ -386,29 +392,29 @@ stock DestroyVehicleSafe(vehicleid)
 
 stock GetModeName(mode)
 {
-    new name[20];
+    static name[20];
     switch(mode)
     {
-        case MODE_FUN: name = "FUN";
-        case MODE_TRAINING: name = "Treinamento";
-        case MODE_CLA_VS_CLA: name = "CLA vs CLA";
-        default: name = "Desconhecido";
+        case MODE_FUN: format(name, sizeof(name), "FUN");
+        case MODE_TRAINING: format(name, sizeof(name), "Treinamento");
+        case MODE_CLA_VS_CLA: format(name, sizeof(name), "CLA vs CLA");
+        default: format(name, sizeof(name), "Desconhecido");
     }
     return name;
 }
 
 stock GetRoomStateName(state)
 {
-    new name[20];
+    static name[20];
     switch(state)
     {
-        case ROOM_STATE_EMPTY: name = "Vazia";
-        case ROOM_STATE_LOBBY: name = "Aguardando";
-        case ROOM_STATE_COUNTDOWN: name = "Iniciando";
-        case ROOM_STATE_RUNNING: name = "Em Partida";
-        case ROOM_STATE_ROUND_END: name = "Fim de Round";
-        case ROOM_STATE_FINISHED: name = "Finalizada";
-        default: name = "---";
+        case ROOM_STATE_EMPTY: format(name, sizeof(name), "Vazia");
+        case ROOM_STATE_LOBBY: format(name, sizeof(name), "Aguardando");
+        case ROOM_STATE_COUNTDOWN: format(name, sizeof(name), "Iniciando");
+        case ROOM_STATE_RUNNING: format(name, sizeof(name), "Em Partida");
+        case ROOM_STATE_ROUND_END: format(name, sizeof(name), "Fim de Round");
+        case ROOM_STATE_FINISHED: format(name, sizeof(name), "Finalizada");
+        default: format(name, sizeof(name), "---");
     }
     return name;
 }

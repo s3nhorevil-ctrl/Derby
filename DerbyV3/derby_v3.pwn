@@ -33,7 +33,6 @@
 #include <Pawn.CMD>
 #include <foreach>
 
-#pragma tabsize 0
 #pragma dynamic 65536
 
 native IsValidVehicle(vehicleid);
@@ -164,7 +163,7 @@ public OnPlayerConnect(playerid)
     // Inicializar dados do jogador
     GetPlayerName(playerid, PlayerData[playerid][PL_NAME], MAX_PLAYER_NAME);
     PlayerData[playerid][PL_ROOM_ID] = INVALID_ROOM_ID;
-    PlayerData[playerid][PL_STATE] = PLAYER_STATE_NONE;
+    PlayerData[playerid][PL_STATE] = PL_ST_NONE;
     PlayerData[playerid][PL_TEAM] = TEAM_NONE;
     PlayerData[playerid][PL_VEHICLE_ID] = INVALID_VEHICLE_ID;
     PlayerData[playerid][PL_SPAWN_SLOT] = -1;
@@ -249,7 +248,7 @@ public OnPlayerRequestClass(playerid, classid)
 public OnPlayerDeath(playerid, killerid, reason)
 {
     if(PlayerData[playerid][PL_ROOM_ID] != INVALID_ROOM_ID &&
-       PlayerData[playerid][PL_STATE] == PLAYER_STATE_ALIVE)
+       PlayerData[playerid][PL_STATE] == PL_ST_ALIVE)
     {
         HandlePlayerFall(playerid);
     }
@@ -264,7 +263,7 @@ public OnPlayerStateChange(playerid, newstate, oldstate)
 {
     // Jogador saiu do veiculo durante partida
     if(PlayerData[playerid][PL_ROOM_ID] != INVALID_ROOM_ID &&
-       PlayerData[playerid][PL_STATE] == PLAYER_STATE_ALIVE)
+       PlayerData[playerid][PL_STATE] == PL_ST_ALIVE)
     {
         if(oldstate == PLAYER_STATE_DRIVER && newstate == PLAYER_STATE_ONFOOT)
         {
@@ -286,7 +285,7 @@ public OnPlayerStateChange(playerid, newstate, oldstate)
 public OnPlayerUpdate(playerid)
 {
     if(PlayerData[playerid][PL_ROOM_ID] == INVALID_ROOM_ID) return 1;
-    if(PlayerData[playerid][PL_STATE] != PLAYER_STATE_ALIVE) return 1;
+    if(PlayerData[playerid][PL_STATE] != PL_ST_ALIVE) return 1;
     
     new roomid = PlayerData[playerid][PL_ROOM_ID];
     if(RoomData[roomid][ROOM_STATE] != ROOM_STATE_RUNNING) return 1;
@@ -321,7 +320,7 @@ stock HandlePlayerFall(playerid)
 {
     new roomid = PlayerData[playerid][PL_ROOM_ID];
     if(roomid == INVALID_ROOM_ID) return 0;
-    if(PlayerData[playerid][PL_STATE] != PLAYER_STATE_ALIVE) return 0;
+    if(PlayerData[playerid][PL_STATE] != PL_ST_ALIVE) return 0;
     if(RoomData[roomid][ROOM_STATE] != ROOM_STATE_RUNNING) return 0;
     
     switch(RoomData[roomid][ROOM_MODE])
@@ -356,7 +355,7 @@ public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
     HandleNitroKeyChange(playerid, newkeys, oldkeys);
     
     // Spectate - trocar de alvo (SPRINT / ENTER)
-    if(PlayerData[playerid][PL_STATE] == PLAYER_STATE_SPECTATING)
+    if(PlayerData[playerid][PL_STATE] == PL_ST_SPECTATING)
     {
         if((newkeys & KEY_SPRINT) && !(oldkeys & KEY_SPRINT))
         {
