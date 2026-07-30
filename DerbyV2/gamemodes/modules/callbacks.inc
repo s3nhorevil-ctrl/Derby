@@ -31,6 +31,7 @@ public OnGameModeInit()
 
     // Estado inicial
     Match[mState] = DERBY_IDLE;
+    Cla_Reset();
 
     print("[DERBY] Gamemode inicializado com sucesso!");
     return 1;
@@ -133,10 +134,38 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
             return 1;
         }
     }
+    // Dialogos do CLA
+    if(dialogid >= DLG_CLA_PANEL && dialogid <= DLG_CLA_MEMBERS)
+        return Cla_HandleDialog(playerid, dialogid, response, listitem, inputtext);
+
     return 0;
 }
 
 public OnPlayerUpdate(playerid)
 {
+    // Detectar queda no CLA
+    if(IsPlayerInCla(playerid) && IsPlayerAlive(playerid) &&
+       (Cla[cState] == CLA_RUNNING || Cla[cState] == CLA_TRAINING || Cla[cState] == CLA_LOBBY))
+    {
+        if(GetPlayerState(playerid) == PLAYER_STATE_DRIVER && Player[playerid][pVehicleID] != INVALID_VEHICLE_ID)
+        {
+            new Float:cx, Float:cy, Float:cz;
+            GetVehiclePos(Player[playerid][pVehicleID], cx, cy, cz);
+            if(Cla[cMapID] >= 0 && cz <= MapInfo[Cla[cMapID]][mapZKill])
+                Cla_PlayerDied(playerid);
+        }
+    }
+
+    // Detectar queda no Treino
+    if(IsPlayerInTrain(playerid) && Player[playerid][pVehicleID] != INVALID_VEHICLE_ID)
+    {
+        if(GetPlayerState(playerid) == PLAYER_STATE_DRIVER)
+        {
+            new Float:tx, Float:ty, Float:tz;
+            GetVehiclePos(Player[playerid][pVehicleID], tx, ty, tz);
+            if(Train_MapID >= 0 && tz <= MapInfo[Train_MapID][mapZKill])
+                Train_PlayerFell(playerid);
+        }
+    }
     return 1;
 }

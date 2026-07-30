@@ -66,8 +66,7 @@ public OnPlayerCommandText(playerid, cmdtext[])
     {
         if(!IsPlayerAdmin(playerid))
             return SCM(playerid, COL_RED, C_RED "Apenas RCON pode usar /cla.");
-        SCM(playerid, COL_GREY, C_GREY "Painel CLA sera implementado na proxima atualizacao.");
-        return 1;
+        return Cla_ShowPanel(playerid);
     }
 
     if(!strcmp(cmd, "/top", true))
