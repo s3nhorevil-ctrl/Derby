@@ -78,6 +78,7 @@ stock IsPlayerPaused(playerid)
 #define DLG_CLA_ROUNDS      (9103)
 #define DLG_CLA_VEICULO     (9104)
 #define DLG_CLA_MEMBERS     (9105)
+#define DLG_WELCOME         (9110)
 
 #define SCM SendClientMessage
 #define SCMToAll SendClientMessageToAll
@@ -1618,25 +1619,41 @@ public OnPlayerDisconnect(playerid, reason)
 
 public OnPlayerSpawn(playerid)
 {
-    // Spawna no mundo - jogador deve usar /derby para entrar
-    if(!PI[playerid][P_IN_DERBY])
-    {
-        SetPlayerPos(playerid, 1958.3783, 1343.1572, 15.3746); // Las Venturas
-        SetPlayerFacingAngle(playerid, 270.0);
-        SetPlayerInterior(playerid, 0);
-        SetPlayerVirtualWorld(playerid, 0);
-        SetCameraBehindPlayer(playerid);
-        SCM(playerid, COLOR_YELLOW, "| INFO | Digite /derby para entrar no modo Derby!");
-    }
+    // Se ja esta no derby ou CLA, nao fazer nada
+    if(PI[playerid][P_IN_DERBY] || CLA_INSCRITO[playerid])
+        return 1;
+
+    // Mostrar tela de boas-vindas/changelog automaticamente
+    SetPlayerPos(playerid, 0.0, 0.0, 20.0);
+    SetPlayerVirtualWorld(playerid, playerid + 500); // mundo isolado
+    SetCameraBehindPlayer(playerid);
+    TogglePlayerControllable(playerid, false);
+
+    new info[800];
+    strcat(info, "{FFFFFF}Bem-vindo ao {FF0000}SERVIDOR DERBY!{FFFFFF}\n\n");
+    strcat(info, "{00FF00}Como funciona:{FFFFFF}\n");
+    strcat(info, "- Voce escolhe entre {FFFF00}MODO FUN{FFFFFF} (mapas automaticos)\n");
+    strcat(info, "  ou {0066FF}CLA VS CLA{FFFFFF} (competitivo)\n\n");
+    strcat(info, "{00FF00}MODO FUN:{FFFFFF}\n");
+    strcat(info, "- Mapas trocam automaticamente\n");
+    strcat(info, "- Ultimo a sobreviver na plataforma vence\n");
+    strcat(info, "- Quem cai e eliminado e assiste\n\n");
+    strcat(info, "{00FF00}CLA VS CLA:{FFFFFF}\n");
+    strcat(info, "- Configurado pelo administrador (RCON)\n");
+    strcat(info, "- Admin define: mapa, veiculo, times e rounds\n");
+    strcat(info, "- Voce pode treinar livremente ate o round comecar\n\n");
+    strcat(info, "{999999}Comandos: /derby /sair /stats /top /ajuda\n");
+    strcat(info, "{999999}CLA VS CLA e configurado apenas pelo RCON.\n");
+
+    ShowPlayerDialog(playerid, DLG_WELCOME, DIALOG_STYLE_MSGBOX,
+        "{FFFFFF}DERBY - Bem-vindo!", info, "Jogar", "");
     return 1;
 }
 
 public OnPlayerRequestClass(playerid, classid)
 {
-    SetPlayerPos(playerid, 1958.3783, 1343.1572, 15.3746);
-    SetPlayerCameraPos(playerid, 1958.3783, 1338.1572, 17.0);
-    SetPlayerCameraLookAt(playerid, 1958.3783, 1343.1572, 15.3746);
-    SetPlayerFacingAngle(playerid, 180.0);
+    // Pula selecao de skin - spawn direto
+    SpawnPlayer(playerid);
     return 1;
 }
 
@@ -1848,6 +1865,19 @@ public OnPlayerClickTextDraw(playerid, Text:clickedid)
 
 public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 {
+    // Tela de boas-vindas -> abre selecao de modo
+    if(dialogid == DLG_WELCOME)
+    {
+        TogglePlayerControllable(playerid, true);
+        SetPlayerVirtualWorld(playerid, 0);
+        // Mostrar painel de escolha de modo automaticamente
+        ShowPlayerDialog(playerid, DLG_MODO, DIALOG_STYLE_LIST,
+            "{FFFFFF}DERBY - Escolha o modo",
+            "MODO FUN (mapas automaticos)\nCLA VS CLA (competitivo)",
+            "Entrar", "");
+        return 1;
+    }
+
     // Tela de escolha de modo
     if(dialogid == DLG_MODO)
     {
