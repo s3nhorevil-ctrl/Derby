@@ -256,9 +256,9 @@ stock HandleDerbyDialogs(playerid, dialogid, response, listitem, inputtext[])
                 case 0: // FUN
                 {
                     JoinRoom(playerid, FUN_ROOM_ID);
-                    // Auto-iniciar se ha jogadores suficientes
+                    // Auto-iniciar partida
                     if(RoomData[FUN_ROOM_ID][ROOM_STATE] == ROOM_STATE_LOBBY
-                        && RoomData[FUN_ROOM_ID][ROOM_PLAYER_COUNT] >= 2)
+                        && RoomData[FUN_ROOM_ID][ROOM_PLAYER_COUNT] >= 1)
                     {
                         StartRoomMatch(FUN_ROOM_ID);
                     }
@@ -507,6 +507,16 @@ stock FinalizeRoomCreation(playerid)
     for(new i = 0; i < RoomCreation[playerid][RC_MAP_COUNT]; i++)
     {
         RoomData[roomid][ROOM_SELECTED_MAPS][i] = RoomCreation[playerid][RC_SELECTED_MAPS][i];
+    }
+    
+    // Auto-iniciar treinamento
+    if(RoomData[roomid][ROOM_MODE] == MODE_TRAINING)
+    {
+        StartRoomMatch(roomid);
+    }
+    else
+    {
+        SCM(playerid, COLOR_CYAN, "{00FFFF}| DERBY | Use /iniciar ou /host para iniciar a partida!");
     }
     
     return 1;

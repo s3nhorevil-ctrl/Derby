@@ -257,10 +257,28 @@ stock StartRoomMatch(roomid)
     if(roomid < 0 || roomid >= MAX_ROOMS) return 0;
     if(RoomData[roomid][ROOM_STATE] != ROOM_STATE_LOBBY) return 0;
     
+    if(RoomData[roomid][ROOM_MAP_COUNT] <= 0)
+    {
+        SendRoomMessage(roomid, COLOR_RED, "[ERRO] Nenhum mapa selecionado para esta sala!");
+        return 0;
+    }
+    
+    if(TotalMaps <= 0)
+    {
+        SendRoomMessage(roomid, COLOR_RED, "[ERRO] Nenhum mapa carregado no servidor!");
+        return 0;
+    }
+    
     new mapid = GetNextMapForRoom(roomid);
     if(mapid < 0 || mapid >= TotalMaps)
     {
-        SendRoomMessage(roomid, COLOR_RED, "[ERRO] Nenhum mapa valido selecionado!");
+        SendRoomMessage(roomid, COLOR_RED, "[ERRO] Mapa invalido! Verifique os arquivos .sfr");
+        return 0;
+    }
+    
+    if(MapPool[mapid][MAP_SPAWNS] <= 0)
+    {
+        SendRoomMessage(roomid, COLOR_RED, "[ERRO] Mapa sem posicoes de spawn!");
         return 0;
     }
     
