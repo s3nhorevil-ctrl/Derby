@@ -139,8 +139,6 @@ enum DINFO
     D_TIMEOUT_TIMER,
     D_MAX_PRIZE,
     D_MAX2_PRIZE,
-    D_DERBYGOD_VOTES[2],
-    D_DERBYGODCAR
 };
 
 enum PINFO
@@ -150,7 +148,6 @@ enum PINFO
     P_DERBY_POSITION,
     P_DERBY_STATUS,
     P_DERBY_SPECTATEPLAYER,
-    bool:P_DERBY_VOTED,
     bool:P_IN_DERBY,
     P_SCORE,
     P_TIMER_PAUSE
@@ -181,11 +178,7 @@ new DERBY_MAPNAME[MAX_DERBYS][24];
 // TextDraws
 new Text:TD_DERBY[9];
 new Text:TD_DerbyMessage;
-new Text:TD_DERBY_GodCar[4];
 new Text:TD_ESPEC_DERBY;
-
-// GodCar
-new bool:DerbyAtivarGod = false;
 
 // Anti-AFK
 new Float:DerbyLastPosHash[MAX_PLAYERS];
@@ -207,7 +200,6 @@ forward NextDerbyStatus();
 forward DerbyCountdown();
 forward DerbyTimeOutCountdown();
 forward HideDerbyMessage();
-forward GodDerbyTimer();
 forward AntiAFKTimer();
 
 
@@ -560,6 +552,7 @@ SpawnDerbyCarForPlayer(playerid, Float:X, Float:Y, Float:Z, Float:Angle, vehicle
     PI[playerid][P_DERBY_VEHICLEID] = CreateVehicle(vehicleid, X, Y, Z, Angle, minrand(128, 255), minrand(128, 255), 99999, false);
     SetVehicleVirtualWorld(PI[playerid][P_DERBY_VEHICLEID], GetPlayerVirtualWorld(playerid));
     PutPlayerInVehicleEx(playerid, PI[playerid][P_DERBY_VEHICLEID], 0);
+    AddVehicleComponent(PI[playerid][P_DERBY_VEHICLEID], 1010); // Nitro controlavel
     return PI[playerid][P_DERBY_VEHICLEID];
 }
 
@@ -582,10 +575,6 @@ CloseDerby()
     DI[D_MAX_PRIZE] = 0;
     DI[D_TIMEOUT_COUNTER] = 0;
     TextDrawSetString(TD_DerbyMessage, "_");
-    DI[D_DERBYGOD_VOTES][0] = 0;
-    DI[D_DERBYGOD_VOTES][1] = 0;
-    TextDrawSetString(TD_DERBY_GodCar[3], "SIM_GOD_CAR:_0~n~NAO_GOD_CAR:_0~n~_");
-    DerbyAtivarGod = false;
     return 1;
 }
 
@@ -626,12 +615,27 @@ PlayerDerbyDead(playerid)
         DI[D_RUNNINGPLAYERS], DI[D_PLAYERS], score_gain);
     GameTextForPlayer(playerid, str, 2000, 3);
 
-    // Mensagem para todos no Derby
+    // Mensagem comica para todos no Derby
     new msg[145];
-    format(msg, sizeof(msg), "{00FF00}| DERBY | %s (%i) Foi eliminado (posicao: %d/%d - Tempo: %s - Premio: +%d Score)",
-        pNome(playerid), playerid, DI[D_RUNNINGPLAYERS], DI[D_PLAYERS],
-        TimeConvert(gettime() - DI[D_TICKCOUNT]), score_gain);
-    SendMessageToAllDerby(COLOR_INFO, msg);
+    new frase[60];
+    switch(random(12))
+    {
+        case 0: frase = "foi comido pelo tubarao! hahaha";
+        case 1: frase = "CAIU! Muito ruim!";
+        case 2: frase = "foi pro fundo do mar!";
+        case 3: frase = "esqueceu que nao tem asas!";
+        case 4: frase = "tentou voar... nao deu certo!";
+        case 5: frase = "virou comida de peixe!";
+        case 6: frase = "olhou pro lado errado e CAIU!";
+        case 7: frase = "tropeou no proprio carro!";
+        case 8: frase = "achou que era passaro!";
+        case 9: frase = "foi empurrado com carinho!";
+        case 10: frase = "disse adeus ao mundo!";
+        case 11: frase = "mergulhou de cabeca!";
+    }
+    format(msg, sizeof(msg), "{FF6600}| DERBY | {FFFFFF}%s {FF6600}%s {999999}(pos: %d/%d | +%d score)",
+        pNome(playerid), frase, DI[D_RUNNINGPLAYERS], DI[D_PLAYERS], score_gain);
+    SendMessageToAllDerby(COLOR_ORANGE, msg);
 
     DI[D_RUNNINGPLAYERS] -= 1;
 
@@ -641,8 +645,7 @@ PlayerDerbyDead(playerid)
         DI[D_RUNNINGPLAYERS] = 0;
         SendMessageToAllDerby(COLOR_YELLOW, "| DERBY | Rodada encerrada. Carregando proximo mapa...");
         TextDrawSetString(TD_DerbyMessage, "~y~rodada encerrada");
-        DerbyAtivarGod = false;
-        DI[D_DERBYGOD_VOTES][0] = 0;
+            DI[D_DERBYGOD_VOTES][0] = 0;
         DI[D_DERBYGOD_VOTES][1] = 0;
         KillTimer(DI[D_TIMEOUT_TIMER]);
         KillTimer(DI[D_NEXTDSTATUS_TIMER]);
@@ -665,8 +668,7 @@ PlayerDerbyDead(playerid)
                 format(win_msg, sizeof(win_msg), "{00FF00}| DERBY | %s (%i) Venceu a partida!", pNome(i), i);
                 SendMessageToAllDerby(COLOR_INFO, win_msg);
 
-                DerbyAtivarGod = false;
-                DI[D_DERBYGOD_VOTES][0] = 0;
+                            DI[D_DERBYGOD_VOTES][0] = 0;
                 DI[D_DERBYGOD_VOTES][1] = 0;
 
                 // Salvar vitoria no banco
@@ -812,11 +814,6 @@ UpdatePlayersDerbyStatus()
                     SetPlayerTime(players, DI[D_HOUR], 0);
                     SetPlayerWeather(players, DI[D_WEATHER]);
                     DerbyAwaySeconds[players] = 0;
-
-                    for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
-                        TextDrawShowForPlayer(players, TD_DERBY_GodCar[i]);
-                    if(!PI[players][P_DERBY_VOTED])
-                        SelectTextDraw(players, 0x999999FF);
                 }
             }
         }
@@ -854,10 +851,6 @@ UpdatePlayersDerbyStatus()
                     for(new i; i < sizeof(TD_DERBY); ++i)
                         TextDrawShowForPlayer(players, TD_DERBY[i]);
 
-                    // Esconder votacao GodCar
-                    for(new x; x < sizeof(TD_DERBY_GodCar); ++x)
-                        TextDrawHideForPlayer(players, TD_DERBY_GodCar[x]);
-                    CancelSelectTextDraw(players);
 
                     // Salvar participacao no banco
                     if(Database != DB:0)
@@ -899,11 +892,6 @@ UpdatePlayerDerbyStatus(playerid)
             SetPlayerTime(playerid, DI[D_HOUR], 0);
             SetPlayerWeather(playerid, DI[D_WEATHER]);
             DerbyAwaySeconds[playerid] = 0;
-
-            for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
-                TextDrawShowForPlayer(playerid, TD_DERBY_GodCar[i]);
-            if(!PI[playerid][P_DERBY_VOTED])
-                SelectTextDraw(playerid, 0x999999FF);
         }
         case DERBY_RUNNING:
         {
@@ -958,14 +946,11 @@ public NextDerbyStatus()
             KillTimer(DI[D_COUNTDOWN_TIMER]);
             DI[D_COUNTDOWN_TIMER] = SetTimer("DerbyCountdown", 900, true);
 
-            TextDrawSetString(TD_DERBY_GodCar[3], "SIM_GOD_CAR:_0~n~NAO_GOD_CAR:_0~n~_");
 
             foreach(players)
             {
                 if(PI[players][P_IN_DERBY])
                 {
-                    for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
-                        TextDrawShowForPlayer(players, TD_DERBY_GodCar[i]);
                     SelectTextDraw(players, 0x999999FF);
                 }
             }
@@ -992,14 +977,11 @@ public NextDerbyStatus()
             KillTimer(DI[D_COUNTDOWN_TIMER]);
             DI[D_COUNTDOWN_TIMER] = SetTimer("DerbyCountdown", 900, true);
 
-            TextDrawSetString(TD_DERBY_GodCar[3], "SIM_GOD_CAR:_0~n~NAO_GOD_CAR:_0~n~_");
 
             foreach(players)
             {
                 if(PI[players][P_IN_DERBY])
                 {
-                    for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
-                        TextDrawShowForPlayer(players, TD_DERBY_GodCar[i]);
                     SelectTextDraw(players, 0x999999FF);
                 }
             }
@@ -1014,7 +996,6 @@ public NextDerbyStatus()
 
             foreach(i)
             {
-                PI[i][P_DERBY_VOTED] = false;
             }
 
             DI[D_COUNTDOWN_COUNTER] = DERBY_COUNTDOWN_SECONDS + 1;
@@ -1028,13 +1009,9 @@ public NextDerbyStatus()
             DI[D_STATUS] = DERBY_RUNNING;
             UpdatePlayersDerbyStatus();
 
-            // Definir GodCar pela votacao
             if(DI[D_DERBYGOD_VOTES][0] > DI[D_DERBYGOD_VOTES][1])
-                DerbyAtivarGod = true;
             else if(DI[D_DERBYGOD_VOTES][1] > DI[D_DERBYGOD_VOTES][0])
-                DerbyAtivarGod = false;
-            else
-                DerbyAtivarGod = bool:random(2);
+                        else
         }
     }
     return 1;
@@ -1089,8 +1066,7 @@ public DerbyTimeOutCountdown()
             }
 
             SendMessageToAllDerby(COLOR_YELLOW, "| DERBY | Partida finalizada - tempo limite excedido!");
-            DerbyAtivarGod = false;
-            DI[D_DERBYGOD_VOTES][0] = 0;
+                    DI[D_DERBYGOD_VOTES][0] = 0;
             DI[D_DERBYGOD_VOTES][1] = 0;
             DI[D_RUNNINGPLAYERS] = 0;
             KillTimer(DI[D_NEXTDSTATUS_TIMER]);
@@ -1170,23 +1146,7 @@ public DerbyCountdown()
 // GOD CAR TIMER - Reparo automatico quando ativado
 // =============================================================================
 
-public GodDerbyTimer()
-{
-    if(DerbyAtivarGod == true && DI[D_STATUS] == DERBY_RUNNING)
-    {
-        foreach(i)
-        {
-            if(PI[i][P_IN_DERBY] && PI[i][P_DERBY_STATUS] == PD_NORMAL)
-            {
-                if(GetPlayerState(i) == PLAYER_STATE_DRIVER)
-                {
-                    RepairVehicle(GetPlayerVehicleID(i));
-                }
-            }
-        }
-    }
-    return 1;
-}
+
 
 // =============================================================================
 // ANTI-AFK TIMER - Detector de jogadores parados
@@ -1247,7 +1207,6 @@ JoinPlayerDerby(playerid)
     DI[D_PLAYERS] += 1;
     PI[playerid][P_IN_DERBY] = true;
     PI[playerid][P_DERBY_VEHICLEID] = INVALID_VEHICLE_ID;
-    PI[playerid][P_DERBY_VOTED] = false;
 
     SetPlayerArmour(playerid, 0.0);
     SetPlayerHealth(playerid, 100.0);
@@ -1288,8 +1247,6 @@ RemovePlayerFromDerby(playerid)
         TextDrawHideForPlayer(playerid, TD_DERBY[ii]);
     TextDrawHideForPlayer(playerid, TD_DerbyMessage);
     TextDrawHideForPlayer(playerid, TD_ESPEC_DERBY);
-    for(new i = 0; i != sizeof TD_DERBY_GodCar; i++)
-        TextDrawHideForPlayer(playerid, TD_DERBY_GodCar[i]);
     CancelSelectTextDraw(playerid);
 
     // Liberar slot
@@ -1400,61 +1357,7 @@ CreateDerbyTextDraws()
     TextDrawFont(TD_DerbyMessage, 3);
     TextDrawSetProportional(TD_DerbyMessage, 1);
 
-    // Box do GodCar
-    TD_DERBY_GodCar[2] = TextDrawCreate(525.000000, 355.000000, "box");
-    TextDrawLetterSize(TD_DERBY_GodCar[2], 0.000000, 6.566666);
-    TextDrawTextSize(TD_DERBY_GodCar[2], 613.000000, 0.000000);
-    TextDrawAlignment(TD_DERBY_GodCar[2], 1);
-    TextDrawColor(TD_DERBY_GodCar[2], -1);
-    TextDrawUseBox(TD_DERBY_GodCar[2], 1);
-    TextDrawBoxColor(TD_DERBY_GodCar[2], 90);
-    TextDrawSetShadow(TD_DERBY_GodCar[2], 0);
-    TextDrawSetOutline(TD_DERBY_GodCar[2], 0);
-    TextDrawBackgroundColor(TD_DERBY_GodCar[2], 255);
-    TextDrawFont(TD_DERBY_GodCar[2], 1);
-    TextDrawSetProportional(TD_DERBY_GodCar[2], 1);
 
-
-    // Botao SIM (GodCar)
-    TD_DERBY_GodCar[0] = TextDrawCreate(545.000000, 391.000000, "~g~~h~~h~SIM");
-    TextDrawLetterSize(TD_DERBY_GodCar[0], 0.400000, 1.600000);
-    TextDrawTextSize(TD_DERBY_GodCar[0], 15.000000, 25.000000);
-    TextDrawAlignment(TD_DERBY_GodCar[0], 2);
-    TextDrawColor(TD_DERBY_GodCar[0], -1);
-    TextDrawUseBox(TD_DERBY_GodCar[0], 1);
-    TextDrawBoxColor(TD_DERBY_GodCar[0], -1600085852);
-    TextDrawSetShadow(TD_DERBY_GodCar[0], 0);
-    TextDrawSetOutline(TD_DERBY_GodCar[0], 1);
-    TextDrawBackgroundColor(TD_DERBY_GodCar[0], 255);
-    TextDrawFont(TD_DERBY_GodCar[0], 1);
-    TextDrawSetProportional(TD_DERBY_GodCar[0], 1);
-    TextDrawSetSelectable(TD_DERBY_GodCar[0], true);
-
-    // Botao NAO (GodCar)
-    TD_DERBY_GodCar[1] = TextDrawCreate(591.000000, 391.000000, "~r~NAO");
-    TextDrawLetterSize(TD_DERBY_GodCar[1], 0.400000, 1.600000);
-    TextDrawTextSize(TD_DERBY_GodCar[1], 15.000000, 30.000000);
-    TextDrawAlignment(TD_DERBY_GodCar[1], 2);
-    TextDrawColor(TD_DERBY_GodCar[1], -1);
-    TextDrawUseBox(TD_DERBY_GodCar[1], 1);
-    TextDrawBoxColor(TD_DERBY_GodCar[1], -1600085852);
-    TextDrawSetShadow(TD_DERBY_GodCar[1], 0);
-    TextDrawSetOutline(TD_DERBY_GodCar[1], 1);
-    TextDrawBackgroundColor(TD_DERBY_GodCar[1], 255);
-    TextDrawFont(TD_DERBY_GodCar[1], 1);
-    TextDrawSetProportional(TD_DERBY_GodCar[1], 1);
-    TextDrawSetSelectable(TD_DERBY_GodCar[1], true);
-
-    // Texto de contagem dos votos
-    TD_DERBY_GodCar[3] = TextDrawCreate(600.000000, 359.000000, "SIM_GOD_CAR:_0~n~NAO_GOD_CAR:_0~n~_");
-    TextDrawLetterSize(TD_DERBY_GodCar[3], 0.266333, 1.197629);
-    TextDrawAlignment(TD_DERBY_GodCar[3], 3);
-    TextDrawColor(TD_DERBY_GodCar[3], -65281);
-    TextDrawSetShadow(TD_DERBY_GodCar[3], 0);
-    TextDrawSetOutline(TD_DERBY_GodCar[3], 1);
-    TextDrawBackgroundColor(TD_DERBY_GodCar[3], 255);
-    TextDrawFont(TD_DERBY_GodCar[3], 1);
-    TextDrawSetProportional(TD_DERBY_GodCar[3], 1);
 
     // Texto de spectate
     TD_ESPEC_DERBY = TextDrawCreate(639.299972, 420.000000, "~W~PRESSIONE ~G~ENTER ~W~PARA VER OUTROS JOGADORES");
@@ -1553,7 +1456,6 @@ public OnGameModeInit()
     InitDatabase();
 
     // Timers globais
-    SetTimer("GodDerbyTimer", 997, true);
     SetTimer("AntiAFKTimer", 1000, true);
 
     // Iniciar o Derby
@@ -1581,7 +1483,6 @@ public OnPlayerConnect(playerid)
     PI[playerid][P_DERBY_POSITION] = 0;
     PI[playerid][P_DERBY_STATUS] = PD_NORMAL;
     PI[playerid][P_DERBY_SPECTATEPLAYER] = 0;
-    PI[playerid][P_DERBY_VOTED] = false;
     PI[playerid][P_SCORE] = 0;
     DerbyAwaySeconds[playerid] = 0;
     DerbyLastPosHash[playerid] = 0.0;
@@ -1769,18 +1670,7 @@ public OnPlayerUpdate(playerid)
 
 public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
 {
-    // NOS (turbo) quando GodCar esta ativado
-    if(PI[playerid][P_IN_DERBY] && PI[playerid][P_DERBY_STATUS] == PD_NORMAL)
-    {
-        if((newkeys & KEY_FIRE) && !(oldkeys & KEY_FIRE))
-        {
-            if(GetPlayerState(playerid) == PLAYER_STATE_DRIVER && DerbyAtivarGod == true)
-            {
-                AddVehicleComponent(GetPlayerVehicleID(playerid), 1009);
-                return 1;
-            }
-        }
-    }
+
 
     // Trocar de spectate (tecla ENTER/SPRINT)
     if(PI[playerid][P_IN_DERBY] && PI[playerid][P_DERBY_STATUS] == PD_SPECTATE)
@@ -1814,49 +1704,7 @@ public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
 }
 
 
-public OnPlayerClickTextDraw(playerid, Text:clickedid)
-{
-    // Votacao GodCar - Botao SIM
-    if(clickedid == TD_DERBY_GodCar[0])
-    {
-        if(PI[playerid][P_IN_DERBY] && DI[D_STATUS] == DERBY_WAIT)
-        {
-            if(PI[playerid][P_DERBY_VOTED])
-                return SCM(playerid, COLOR_RED, "[ERRO]: Voce ja votou.");
 
-            DI[D_DERBYGOD_VOTES][0]++;
-            new str[50];
-            format(str, sizeof str, "SIM_GOD_CAR:_%d~n~NAO_GOD_CAR:_%d~n~_",
-                DI[D_DERBYGOD_VOTES][0], DI[D_DERBYGOD_VOTES][1]);
-            TextDrawSetString(TD_DERBY_GodCar[3], str);
-            CancelSelectTextDraw(playerid);
-            PI[playerid][P_DERBY_VOTED] = true;
-            SCM(playerid, COLOR_GREEN, "| DERBY | Voce votou SIM para God Car!");
-            return 1;
-        }
-    }
-
-    // Votacao GodCar - Botao NAO
-    if(clickedid == TD_DERBY_GodCar[1])
-    {
-        if(PI[playerid][P_IN_DERBY] && DI[D_STATUS] == DERBY_WAIT)
-        {
-            if(PI[playerid][P_DERBY_VOTED])
-                return SCM(playerid, COLOR_RED, "[ERRO]: Voce ja votou.");
-
-            DI[D_DERBYGOD_VOTES][1]++;
-            new str[50];
-            format(str, sizeof str, "SIM_GOD_CAR:_%d~n~NAO_GOD_CAR:_%d~n~_",
-                DI[D_DERBYGOD_VOTES][0], DI[D_DERBYGOD_VOTES][1]);
-            TextDrawSetString(TD_DERBY_GodCar[3], str);
-            CancelSelectTextDraw(playerid);
-            PI[playerid][P_DERBY_VOTED] = true;
-            SCM(playerid, COLOR_GREEN, "| DERBY | Voce votou NAO para God Car!");
-            return 1;
-        }
-    }
-    return 1;
-}
 
 
 // =============================================================================
