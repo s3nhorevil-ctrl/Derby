@@ -426,7 +426,7 @@ CMD:stats(playerid, params[])
 {
     new str[256];
     SCM(playerid, COLOR_GREEN, "============ SUAS ESTATISTICAS ============");
-    format(str, sizeof str, "   Vitorias: {00FF00}%d  {FFFFFF}| Derrotas: {FF0000}%d  {FFFFFF}| Score: {FFFF00}%d",
+    format(str, sizeof(str), "   Vitorias: {00FF00}%d  {FFFFFF}| Derrotas: {FF0000}%d  {FFFFFF}| Score: {FFFF00}%d",
         PlayerData[playerid][PL_WINS], PlayerData[playerid][PL_LOSSES], PlayerData[playerid][PL_SCORE]);
     SCM(playerid, COLOR_WHITE, str);
     SCM(playerid, COLOR_GREEN, "============================================");
@@ -479,7 +479,7 @@ CMD:top(playerid, params[])
         new str[128];
         for(new i = 0; i < count; i++)
         {
-            format(str, sizeof str, "  #%d - %s | Vitorias: %d | Score: %d",
+            format(str, sizeof(str), "  #%d - %s | Vitorias: %d | Score: %d",
                 i + 1, PlayerData[topPlayers[i]][PL_NAME], topWins[i], PlayerData[topPlayers[i]][PL_SCORE]);
             SCM(playerid, COLOR_WHITE, str);
         }
@@ -528,16 +528,18 @@ CMD:sala(playerid, params[])
         return 1;
     }
     
-    new str[256];
+    new str[256], modename[20], statename[20], vehname[24];
     SCM(playerid, COLOR_CYAN, "============ INFO DA SALA ============");
     
     format(str, sizeof(str), "  Nome: {FFFF00}%s", RoomData[roomid][ROOM_NAME]);
     SCM(playerid, COLOR_WHITE, str);
     
-    format(str, sizeof(str), "  Modo: {00FF00}%s", GetModeName(RoomData[roomid][ROOM_MODE]));
+    GetModeName(RoomData[roomid][ROOM_MODE], modename, sizeof(modename));
+    format(str, sizeof(str), "  Modo: {00FF00}%s", modename);
     SCM(playerid, COLOR_WHITE, str);
     
-    format(str, sizeof(str), "  Status: {00FF00}%s", GetRoomStateName(RoomData[roomid][ROOM_STATE]));
+    GetRoomStateName(RoomData[roomid][ROOM_STATE], statename, sizeof(statename));
+    format(str, sizeof(str), "  Status: {00FF00}%s", statename);
     SCM(playerid, COLOR_WHITE, str);
     
     format(str, sizeof(str), "  Jogadores: {FFFF00}%d/%d",
@@ -548,8 +550,8 @@ CMD:sala(playerid, params[])
         RoomData[roomid][ROOM_CURRENT_ROUND], RoomData[roomid][ROOM_TOTAL_ROUNDS]);
     SCM(playerid, COLOR_WHITE, str);
     
-    format(str, sizeof(str), "  Veiculo: {FFFF00}%s",
-        GetVehicleNameByModel(RoomData[roomid][ROOM_VEHICLE]));
+    GetVehicleNameByModel(RoomData[roomid][ROOM_VEHICLE], vehname, sizeof(vehname));
+    format(str, sizeof(str), "  Veiculo: {FFFF00}%s", vehname);
     SCM(playerid, COLOR_WHITE, str);
     
     format(str, sizeof(str), "  Mapas: {FFFF00}%d selecionados", RoomData[roomid][ROOM_MAP_COUNT]);

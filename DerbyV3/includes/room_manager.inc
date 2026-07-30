@@ -50,9 +50,10 @@ stock CreateRoom(playerid, mode, const roomname[], rounds, vehiclemodel)
     // Jogador entra automaticamente
     JoinRoom(playerid, roomid);
     
-    new str[128];
+    new str[128], modename[20];
+    GetModeName(mode, modename, sizeof(modename));
     format(str, sizeof(str), "{00FF00}| DERBY | Sala '%s' criada! Modo: %s | Rounds: %d",
-        roomname, GetModeName(mode), rounds);
+        roomname, modename, rounds);
     SCM(playerid, COLOR_INFO, str);
     
     return roomid;

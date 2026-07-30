@@ -64,13 +64,24 @@ stock ShowRoomList(playerid)
         if(RoomData[i][ROOM_PRIVATE]) format(lock, sizeof(lock), "[P]");
         else lock[0] = '\0';
         
-        new modename[20], statename[20], tmp[64];
-        format(modename, sizeof modename, "%s", GetModeName(RoomData[i][ROOM_MODE]));
-        format(statename, sizeof statename, "%s", GetRoomStateName(RoomData[i][ROOM_STATE]));
+        new modename[20], statename[20];
+        GetModeName(RoomData[i][ROOM_MODE], modename, sizeof(modename));
+        GetRoomStateName(RoomData[i][ROOM_STATE], statename, sizeof(statename));
         
-        format(tmp, sizeof tmp, "%d/%d", RoomData[i][ROOM_PLAYER_COUNT], RoomData[i][ROOM_MAX_PLAYERS]);
-        format(line, sizeof line, "%s%s\t%s\t%s\t%s\n",
-            lock, RoomData[i][ROOM_NAME], modename, tmp, statename);
+        // Build line in parts to avoid format argument limit
+        line[0] = '\0';
+        strcat(line, lock);
+        strcat(line, RoomData[i][ROOM_NAME]);
+        strcat(line, "\t");
+        strcat(line, modename);
+        strcat(line, "\t");
+        
+        new tmp2[16];
+        format(tmp2, sizeof(tmp2), "%d/%d", RoomData[i][ROOM_PLAYER_COUNT], RoomData[i][ROOM_MAX_PLAYERS]);
+        strcat(line, tmp2);
+        strcat(line, "\t");
+        strcat(line, statename);
+        strcat(line, "\n");
         strcat(str, line);
         count++;
     }
@@ -206,8 +217,9 @@ stock ShowRoomNameInput(playerid)
 
 stock ShowRoomConfirmation(playerid)
 {
-    new str[512], vehname[24];
-    format(vehname, sizeof(vehname), "%s", GetVehicleNameByModel(RoomCreation[playerid][RC_VEHICLE]));
+    new str[512], vehname[24], modename[20];
+    GetVehicleNameByModel(RoomCreation[playerid][RC_VEHICLE], vehname, sizeof(vehname));
+    GetModeName(RoomCreation[playerid][RC_MODE], modename, sizeof(modename));
     
     format(str, sizeof(str),
         "{FFFFFF}Confirme as configuracoes da sala:\n\n"\
@@ -217,7 +229,7 @@ stock ShowRoomConfirmation(playerid)
         "{00FF00}Mapas:{FFFFFF} %d selecionados\n"\
         "{00FF00}Nome:{FFFFFF} %s\n\n"\
         "Deseja criar a sala?",
-        GetModeName(RoomCreation[playerid][RC_MODE]),
+        modename,
         RoomCreation[playerid][RC_ROUNDS],
         vehname,
         RoomCreation[playerid][RC_MAP_COUNT],
