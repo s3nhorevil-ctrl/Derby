@@ -149,13 +149,15 @@ public HUD_HideCountdown()
     return 1;
 }
 
-stock HUD_UpdateTimer(seconds)
+stock HUD_UpdateTimer(seconds, alive = -1, total = -1)
 {
     TextDrawSetString(TD_Timer, FormatTime(seconds));
-
-    new str[32];
-    format(str, sizeof(str), "~w~Vivos: ~g~%d~w~/%d", Match[mAlivePlayers], Match[mPlayers]);
-    TextDrawSetString(TD_Alive, str);
+    if(alive >= 0)
+    {
+        new str[32];
+        format(str, sizeof(str), "~w~Vivos: ~g~%d~w~/%d", alive, total);
+        TextDrawSetString(TD_Alive, str);
+    }
 }
 
 stock HUD_ShowWinner(winner)

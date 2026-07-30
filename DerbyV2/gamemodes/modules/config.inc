@@ -59,6 +59,7 @@
 #define C_GREY                  "{AAAAAA}"
 #define C_DERBY                 "{FF6600}"
 #define C_GOLD                  "{FFD700}"
+#define C_CYAN                  "{00FFFF}"
 
 // --- Macros ---
 #define SCM                     SendClientMessage

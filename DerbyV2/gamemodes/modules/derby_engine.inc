@@ -168,7 +168,7 @@ public Derby_RoundTick()
     }
 
     Match[mTimeLeft]--;
-    HUD_UpdateTimer(Match[mTimeLeft]);
+    HUD_UpdateTimer(Match[mTimeLeft], Match[mAlivePlayers], Match[mPlayers]);
 
     // Timeout
     if(Match[mTimeLeft] <= 0)
